@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理費・修繕積立金等 精算書</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Hiragino Kaku Gothic ProN','Hiragino Sans','Meiryo',sans-serif;background:#eef2f7;color:#333;min-height:100vh;padding:24px 16px 48px;}
+    .container{max-width:820px;margin:0 auto;}
+
+    header{text-align:center;margin-bottom:24px;}
+    header h1{font-size:22px;color:#1a3a5c;font-weight:bold;line-height:1.5;}
+    header p{font-size:12px;color:#888;margin-top:6px;}
+
+    .card{background:#fff;border-radius:10px;padding:22px;margin-bottom:18px;box-shadow:0 2px 10px rgba(0,0,0,.08);}
+    .card-title{font-size:15px;font-weight:bold;color:#1a3a5c;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid #e2eaf5;display:flex;align-items:center;gap:8px;}
+
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+    .form-grid .full{grid-column:1/-1;}
+
+    label.lbl{display:block;font-size:12px;font-weight:bold;color:#555;margin-bottom:4px;}
+    .required{color:#e53e3e;margin-left:2px;}
+    .optional{color:#aaa;font-weight:normal;font-size:10px;margin-left:3px;}
+    .hint{font-size:10px;color:#888;margin-top:3px;line-height:1.6;}
+    .error-msg{color:#e53e3e;font-size:11px;margin-top:2px;display:none;}
+
+    input[type=text],input[type=date],input[type=number]{padding:8px 10px;border:1.5px solid #d0d9e8;border-radius:5px;font-size:13px;font-family:inherit;color:#333;background:#fff;width:100%;transition:border-color .2s;}
+    input:focus{outline:none;border-color:#4a90d9;box-shadow:0 0 0 3px rgba(74,144,217,.12);}
+    input::placeholder{color:#bbb;}
+    input.invalid{border-color:#e53e3e!important;}
+
+    /* 費用入力テーブル */
+    .fee-table{width:100%;border-collapse:collapse;margin-bottom:8px;}
+    .fee-table th{padding:8px 10px;font-size:11px;font-weight:bold;background:#334e6e;color:#fff;text-align:center;}
+    .fee-table th.left{text-align:left;}
+    .fee-table td{padding:6px 8px;border-bottom:1px solid #e5eaf3;vertical-align:middle;}
+    .fee-table td.label-cell{font-size:12px;color:#555;}
+    .fee-table tr.total-row td{background:#d1fae5;font-weight:bold;font-size:14px;color:#065f46;}
+    .fee-table tr.other-row td{background:#fafbfd;}
+
+    .btn-add{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border:1.5px dashed #94a3b8;border-radius:5px;background:#f8fafc;font-size:12px;color:#64748b;cursor:pointer;font-family:inherit;transition:all .15s;}
+    .btn-add:hover{background:#e2e8f0;border-color:#64748b;}
+    .btn-del{background:none;border:none;color:#e53e3e;cursor:pointer;font-size:14px;padding:0 4px;line-height:1;}
+    .btn-del:hover{opacity:.7;}
+
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 20px;border:none;border-radius:7px;font-size:14px;font-family:inherit;font-weight:bold;cursor:pointer;transition:background .2s,transform .1s;}
+    .btn:active{transform:scale(.98);}
+    .btn-calc{background:#1e3a6e;color:#fff;width:100%;margin-top:16px;padding:14px;font-size:16px;}
+    .btn-calc:hover{background:#152d55;}
+    .btn-reset{background:#f1f5f9;color:#64748b;font-size:12px;padding:7px 14px;}
+    .btn-reset:hover{background:#e2e8f0;}
+    .btn-excel{background:#16a34a;color:#fff;}
+    .btn-excel:hover{background:#15803d;}
+
+    /* ===== 精算書 ===== */
+    #resultArea{display:none;}
+    .result-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;}
+
+    .seisan-wrap{border:1.5px solid #b0c4de;border-radius:8px;overflow:hidden;margin-bottom:16px;}
+    .seisan-title{background:#1e3a6e;color:#fff;text-align:center;padding:12px;font-size:16px;font-weight:bold;letter-spacing:.05em;}
+    .seisan-info{background:#eff6ff;padding:10px 16px;font-size:12px;color:#1e40af;line-height:2.0;border-bottom:1px solid #bfdbfe;}
+
+    .seisan-section{padding:14px 16px;border-bottom:1px solid #e2eaf3;}
+    .seisan-section:last-child{border-bottom:none;}
+    .sec-heading{font-size:12px;font-weight:bold;color:#334e6e;margin-bottom:10px;padding-bottom:5px;border-bottom:1px dashed #cbd5e1;}
+
+    .monthly-box{background:#fafbfd;border:1px solid #d0d9e8;border-radius:6px;padding:12px 16px;margin-bottom:10px;}
+    .monthly-total{font-size:20px;font-weight:bold;color:#1e3a6e;}
+    .monthly-breakdown{font-size:12px;color:#64748b;margin-top:4px;}
+
+    /* 負担期間・金額 */
+    .futan-row{display:flex;align-items:flex-start;gap:10px;padding:9px 12px;border-radius:6px;margin-bottom:8px;}
+    .futan-row.seller{background:#fefce8;border:1px solid #fde68a;}
+    .futan-row.buyer{background:#fdf4ff;border:1px solid #e9d5ff;}
+    .futan-party{font-weight:bold;min-width:42px;color:#1e3a6e;font-size:13px;}
+    .futan-detail{flex:1;}
+    .futan-period{color:#64748b;font-size:11px;}
+    .futan-calc{color:#374151;font-size:12px;margin-top:2px;}
+    .futan-amount{font-weight:bold;font-size:15px;color:#1e3a6e;white-space:nowrap;margin-left:auto;align-self:center;}
+
+    /* 決済時精算 */
+    .ketsusan-table{width:100%;border-collapse:collapse;font-size:13px;}
+    .ketsusan-table td{padding:9px 12px;border-bottom:1px solid #e5eaf3;}
+    .ketsusan-table td.k-label{color:#555;background:#f8fafc;}
+    .ketsusan-table td.k-val{text-align:right;font-weight:bold;color:#1e3a6e;}
+    .ketsusan-table tr.k-total td{background:#d1fae5;font-size:15px;color:#065f46;font-weight:bold;}
+    .ketsusan-table tr.k-note td{background:#f0f9ff;font-size:11px;color:#0369a1;}
+
+    .settle-box{background:#fef9c3;border:2px solid #d97706;border-radius:8px;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;margin-top:12px;flex-wrap:wrap;gap:8px;}
+    .settle-label{font-size:13px;font-weight:bold;color:#78350f;}
+    .settle-amount{font-size:26px;font-weight:bold;color:#78350f;}
+
+    .note{font-size:11px;color:#999;margin-top:12px;line-height:1.8;padding:10px 12px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;}
+
+    @media(max-width:600px){
+      .form-grid{grid-template-columns:1fr;}
+      .result-header{flex-direction:column;gap:10px;align-items:flex-start;}
+      .futan-row{flex-direction:column;gap:4px;}
+      .futan-amount{margin-left:0;}
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>管理費・修繕積立金等　精算書</h1>
+    <p>マンション等の引渡し時における管理費・修繕積立金の日割精算</p>
+  </header>
+
+  <!-- 基本情報 -->
+  <div class="card">
+    <div class="card-title">&#128197; 基本情報</div>
+    <div class="form-grid">
+      <div class="full">
+        <label class="lbl">物件所在地<span class="optional">任意</span></label>
+        <input type="text" id="address" placeholder="例：札幌市中央区○○町1丁目2番地3号">
+      </div>
+      <div>
+        <label class="lbl">物件名称<span class="optional">任意</span></label>
+        <input type="text" id="buildingName" placeholder="例：○○マンション">
+      </div>
+      <div>
+        <label class="lbl">号室<span class="optional">任意</span></label>
+        <input type="text" id="roomNo" placeholder="例：101号室">
+      </div>
+      <div>
+        <label class="lbl">売主氏名<span class="optional">任意</span></label>
+        <input type="text" id="sellerName" placeholder="例：山田 太郎">
+      </div>
+      <div>
+        <label class="lbl">買主氏名<span class="optional">任意</span></label>
+        <input type="text" id="buyerName" placeholder="例：鈴木 花子">
+      </div>
+      <div class="full">
+        <label class="lbl">引渡日<span class="required">*</span></label>
+        <input type="date" id="settlementDate">
+        <span class="error-msg" id="err-date">引渡日を入力してください。</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 月額費用 -->
+  <div class="card">
+    <div class="card-title">&#128176; 月額費用の入力</div>
+
+    <p style="font-size:12px;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:10px 14px;margin-bottom:16px;line-height:1.8;">
+      引渡月の管理費・修繕積立金等の<strong>月額合計</strong>を入力してください。<br>
+      内訳（管理費・修繕積立金・その他）を個別に入力することもできます。
+    </p>
+
+    <table class="fee-table">
+      <thead>
+        <tr>
+          <th class="left" style="width:50%">項目名</th>
+          <th style="width:40%">月額（円）</th>
+          <th style="width:10%"></th>
+        </tr>
+      </thead>
+      <tbody id="feeTableBody">
+        <tr data-key="kanrihi">
+          <td class="label-cell"><input type="text" value="管理費" placeholder="項目名"></td>
+          <td><input type="number" class="fee-amount" placeholder="例：15,000" min="0" step="1" oninput="updateTotal()"></td>
+          <td></td>
+        </tr>
+        <tr data-key="tsumitate">
+          <td class="label-cell"><input type="text" value="修繕積立金" placeholder="項目名"></td>
+          <td><input type="number" class="fee-amount" placeholder="例：8,000" min="0" step="1" oninput="updateTotal()"></td>
+          <td></td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr class="total-row">
+          <td style="padding:10px 10px;font-weight:bold;color:#065f46;font-size:13px;">月額 合計</td>
+          <td style="text-align:right;padding:10px;font-size:16px;font-weight:bold;color:#065f46;" id="totalDisplay">0 円</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <button class="btn-add" onclick="addFeeRow()">＋ 項目を追加（駐車場・インターネット等）</button>
+    <span class="error-msg" id="err-fee" style="display:block;margin-top:6px;">月額費用を入力してください。</span>
+
+    <button class="btn btn-calc" onclick="calculate()">&#9654; 精算書を作成する</button>
+  </div>
+
+  <!-- 精算書 -->
+  <div class="card" id="resultArea">
+    <div class="result-header">
+      <div class="card-title" style="margin-bottom:0;padding-bottom:0;border-bottom:none;">精算書</div>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <button class="btn btn-reset" onclick="resetForm()">&#8635; リセット</button>
+        <button class="btn btn-excel" onclick="downloadExcel()">&#8595; Excel出力</button>
+      </div>
+    </div>
+    <div style="margin-top:14px;" id="seisanBody"></div>
+  </div>
+</div>
+
+<script>
+/* ===== ユーティリティ ===== */
+let calcResult = null;
+let extraRows = 0;
+
+function v(id){return document.getElementById(id).value;}
+function num(id){const n=parseFloat(v(id));return isNaN(n)?0:n;}
+function fmt(n){return Math.round(n).toLocaleString('ja-JP')+'円';}
+function fmtN(n){return Math.round(n).toLocaleString('ja-JP');}
+
+function toWareki(y){
+  if(y>=2019) return `令和${y-2018}`;
+  if(y>=1989) return `平成${y-1988}`;
+  return `昭和${y-1925}`;
+}
+function fmtDate(y,m,d){return `${toWareki(y)}年${m}月${d}日`;}
+
+// 月の末日取得
+function lastDayOfMonth(y,m){return new Date(y,m,0).getDate();}
+
+/* ===== 費用テーブル ===== */
+function addFeeRow(){
+  extraRows++;
+  const tbody = document.getElementById('feeTableBody');
+  const tr = document.createElement('tr');
+  tr.setAttribute('data-key', `extra${extraRows}`);
+  tr.classList.add('other-row');
+  tr.innerHTML = `
+    <td class="label-cell"><input type="text" placeholder="例：駐車場"></td>
+    <td><input type="number" class="fee-amount" placeholder="例：10,000" min="0" step="1" oninput="updateTotal()"></td>
+    <td><button class="btn-del" onclick="this.closest('tr').remove();updateTotal()">✕</button></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function updateTotal(){
+  let total = 0;
+  document.querySelectorAll('.fee-amount').forEach(el=>{
+    total += parseFloat(el.value)||0;
+  });
+  document.getElementById('totalDisplay').textContent = fmtN(total) + ' 円';
+  return total;
+}
+
+function getFeeItems(){
+  const items = [];
+  document.querySelectorAll('#feeTableBody tr').forEach(tr=>{
+    const nameEl = tr.querySelector('input[type=text]');
+    const amtEl  = tr.querySelector('input[type=number]');
+    if(!nameEl||!amtEl) return;
+    const name = nameEl.value.trim()||'（未入力）';
+    const amt  = parseFloat(amtEl.value)||0;
+    if(amt>0) items.push({name, amt});
+  });
+  return items;
+}
+
+/* ===== バリデーション ===== */
+function validate(){
+  let ok = true;
+  const noDate = !v('settlementDate');
+  document.getElementById('settlementDate').classList.toggle('invalid', noDate);
+  document.getElementById('err-date').style.display = noDate?'block':'none';
+  if(noDate) ok = false;
+
+  const total = updateTotal();
+  const noFee = total <= 0;
+  document.getElementById('err-fee').style.display = noFee?'block':'none';
+  if(noFee) ok = false;
+  return ok;
+}
+
+/* ===== 計算 ===== */
+function calculate(){
+  if(!validate()) return;
+
+  const sd    = new Date(v('settlementDate'));
+  const year  = sd.getFullYear();
+  const month = sd.getMonth()+1;
+  const day   = sd.getDate();
+
+  const lastDay = lastDayOfMonth(year, month); // 引渡月の末日
+  const nextMonth = month===12 ? 1 : month+1;
+  const nextYear  = month===12 ? year+1 : year;
+  const nextNextMonth = nextMonth===12 ? 1 : nextMonth+1;
+  const nextNextYear  = nextMonth===12 ? nextYear+1 : nextYear;
+
+  // 売主日数：1日〜引渡日前日
+  const sDays = day - 1;
+  // 買主日数：引渡日〜月末
+  const bDays = lastDay - sDays; // = lastDay - (day-1)
+
+  const items   = getFeeItems();
+  const monthly = items.reduce((s,x)=>s+x.amt, 0);
+
+  // 日割計算（売主は切捨、買主は残余）
+  const sellerDayAmt = Math.floor(monthly * sDays / lastDay);
+  const buyerDayAmt  = monthly - sellerDayAmt;
+
+  // 決済時支払額 = 引渡月の買主日割り + 翌月分全額
+  const settlementTotal = buyerDayAmt + monthly;
+
+  calcResult = {
+    address: v('address').trim(),
+    buildingName: v('buildingName').trim(),
+    roomNo: v('roomNo').trim(),
+    sellerName: v('sellerName').trim(),
+    buyerName: v('buyerName').trim(),
+    year, month, day, lastDay,
+    nextMonth, nextYear, nextNextMonth, nextNextYear,
+    sDays, bDays,
+    items, monthly,
+    sellerDayAmt, buyerDayAmt,
+    settlementTotal,
+  };
+  renderResult(calcResult);
+}
+
+/* ===== 表示 ===== */
+function renderResult(r){
+  const warekiYear = toWareki(r.year);
+  const breakdownStr = r.items.map(x=>`${x.name} ${fmtN(x.amt)}円`).join('、');
+
+  let html = `<div class="seisan-wrap">`;
+
+  // タイトル
+  html += `<div class="seisan-title">管理費修繕積立金等精算書</div>`;
+
+  // 基本情報
+  html += `<div class="seisan-info">`;
+  if(r.address)      html += `<strong>物件所在地：</strong>${r.address}<br>`;
+  if(r.buildingName||r.roomNo) html += `<strong>物件名称：</strong>${r.buildingName||''}${r.roomNo?'　'+r.roomNo:''}<br>`;
+  if(r.sellerName||r.buyerName){
+    if(r.sellerName) html += `<strong>売主：</strong>${r.sellerName}　`;
+    if(r.buyerName)  html += `<strong>買主：</strong>${r.buyerName}`;
+    html += '<br>';
+  }
+  html += `<strong>引渡日：</strong>${fmtDate(r.year,r.month,r.day)}`;
+  html += `</div>`;
+
+  // 月額費用
+  html += `<div class="seisan-section">`;
+  html += `<div class="sec-heading">&#10102; ${warekiYear}年 ${r.month}月度　管理費・修繕積立金等金額</div>`;
+  html += `<div class="monthly-box">`;
+  html += `<div class="monthly-total">${fmtN(r.monthly)}円</div>`;
+  html += `<div class="monthly-breakdown">内訳：${breakdownStr}</div>`;
+  html += `</div>`;
+  html += `</div>`;
+
+  // 日数負担分
+  html += `<div class="seisan-section">`;
+  html += `<div class="sec-heading">&#10103; 日数負担分（引渡月：${r.month}月）</div>`;
+
+  if(r.sDays === 0){
+    html += `<div style="font-size:12px;color:#16a34a;background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:10px;margin-bottom:8px;">
+      引渡日が1日のため、売主の日割り負担はありません。
+    </div>`;
+  }
+
+  // 売主
+  const sellerPeriodStr = r.sDays>0
+    ? `${r.month}月1日 ～ ${r.month}月${r.day-1}日（${r.sDays}日間）`
+    : '負担なし（引渡日が1日）';
+  html += `<div class="futan-row seller">
+    <div class="futan-party">売主</div>
+    <div class="futan-detail">
+      <div class="futan-period">&#128197; ${sellerPeriodStr}</div>
+      <div class="futan-calc">${fmtN(r.monthly)}円 × ${r.sDays}日 ÷ ${r.lastDay}日（${r.month}月末日）</div>
+    </div>
+    <div class="futan-amount">${fmt(r.sellerDayAmt)}</div>
+  </div>`;
+
+  // 買主
+  const buyerPeriodStr = `${r.month}月${r.day}日 ～ ${r.month}月${r.lastDay}日（${r.bDays}日間）`;
+  html += `<div class="futan-row buyer">
+    <div class="futan-party">買主</div>
+    <div class="futan-detail">
+      <div class="futan-period">&#128197; ${buyerPeriodStr}</div>
+      <div class="futan-calc">${fmtN(r.monthly)}円 × ${r.bDays}日 ÷ ${r.lastDay}日（${r.month}月末日）</div>
+    </div>
+    <div class="futan-amount">${fmt(r.buyerDayAmt)}</div>
+  </div>`;
+
+  html += `</div>`;// seisan-section
+
+  // 決済時精算
+  html += `<div class="seisan-section">`;
+  html += `<div class="sec-heading">&#10104; 決済時の精算額（買主 → 売主）</div>`;
+  html += `<table class="ketsusan-table">
+    <tr>
+      <td class="k-label">${r.month}月分（引渡月の買主日割負担）</td>
+      <td class="k-val">${fmt(r.buyerDayAmt)}</td>
+    </tr>
+    <tr>
+      <td class="k-label">${r.nextMonth}月分（翌月分全額）</td>
+      <td class="k-val">${fmt(r.monthly)}</td>
+    </tr>
+    <tr class="k-total">
+      <td class="k-label" style="font-weight:bold;">決済時 合計支払額</td>
+      <td class="k-val" style="font-size:18px;">${fmt(r.settlementTotal)}</td>
+    </tr>
+    <tr class="k-note">
+      <td colspan="2">&#128204; ${r.nextNextMonth}月分より、買主様が管理組合へ直接お支払いとなります。</td>
+    </tr>
+  </table>`;
+  html += `</div>`;
+
+  html += `</div>`; // seisan-wrap
+
+  // 精算金ボックス
+  html += `<div class="settle-box">
+    <div class="settle-label">決済時 精算金（買主 → 売主）</div>
+    <div class="settle-amount">&#65509;${fmtN(r.settlementTotal)}</div>
+  </div>`;
+
+  // 注記
+  html += `<p class="note">
+    ※ 売主負担：引渡月の1日〜引渡日前日　買主負担：引渡日〜引渡月末日<br>
+    ※ 売主日割額は円未満切捨、買主日割額 ＝ 月額 − 売主日割額<br>
+    ※ 決済時精算額 ＝ 引渡月の買主日割分 ＋ 翌月分（全額）<br>
+    ※ 引渡月翌々月（${r.nextNextMonth}月）分より買主様が管理組合へ直接お支払いとなります
+  </p>`;
+
+  document.getElementById('seisanBody').innerHTML = html;
+  document.getElementById('resultArea').style.display = 'block';
+  document.getElementById('resultArea').scrollIntoView({behavior:'smooth'});
+}
+
+/* ===== リセット ===== */
+function resetForm(){
+  ['address','buildingName','roomNo','sellerName','buyerName','settlementDate'].forEach(id=>document.getElementById(id).value='');
+  // fee table reset
+  const tbody = document.getElementById('feeTableBody');
+  tbody.querySelectorAll('tr[data-key^=extra]').forEach(tr=>tr.remove());
+  tbody.querySelectorAll('.fee-amount').forEach(el=>el.value='');
+  extraRows = 0;
+  updateTotal();
+  ['err-date','err-fee'].forEach(id=>document.getElementById(id).style.display='none');
+  document.getElementById('settlementDate').classList.remove('invalid');
+  document.getElementById('resultArea').style.display='none';
+  calcResult = null;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* ===== Excel出力 ===== */
+function downloadExcel(){
+  if(!calcResult){alert('先に計算を実行してください。');return;}
+  if(typeof XLSX==='undefined'){alert('ライブラリ未読込。ページを再読み込みしてください。');return;}
+  try{
+    const wb = XLSX.utils.book_new();
+    buildSeisanSheet(wb, calcResult);
+    const fn = `管理費精算書_${calcResult.year}年${calcResult.month}月_${calcResult.buildingName||calcResult.address||'物件'}.xlsx`;
+    XLSX.writeFile(wb, fn);
+  }catch(e){alert('Excel出力エラー: '+e.message);console.error(e);}
+}
+
+function buildSeisanSheet(wb, r){
+  const ws={};const merges=[];const rowH=[];let rn=-1;
+  function nr(vals,h){rn++;rowH.push({hpt:h||15});vals.forEach((cell,ci)=>{if(cell!=null)ws[XLSX.utils.encode_cell({r:rn,c:ci})]=cell;});return rn;}
+  const M=(r1,c1,r2,c2)=>merges.push({s:{r:r1,c:c1},e:{r:r2,c:c2}});
+  const BD={top:{style:'thin',color:{rgb:'B0C4DE'}},bottom:{style:'thin',color:{rgb:'B0C4DE'}},left:{style:'thin',color:{rgb:'B0C4DE'}},right:{style:'thin',color:{rgb:'B0C4DE'}}};
+  const BDm=c=>({top:{style:'medium',color:{rgb:c}},bottom:{style:'medium',color:{rgb:c}},left:{style:'medium',color:{rgb:c}},right:{style:'medium',color:{rgb:c}}});
+  function cs(v,s){return{v,t:'s',s:s||{}};}
+  function cn(v,s){return{v,t:'n',s:s||{}};}
+  function fnt(bold,sz,clr){return{name:'メイリオ',bold:!!bold,sz:sz||10,color:{rgb:clr||'333333'}};}
+  function fill(c){return{patternType:'solid',fgColor:{rgb:c}};}
+  function aln(h){return{horizontal:h||'left',vertical:'center'};}
+
+  const warekiYear = toWareki(r.year);
+  const breakdownStr = r.items.map(x=>`${x.name} ${fmtN(x.amt)}円`).join('、');
+
+  // ── タイトル ──
+  let rr = nr([cs('管理費修繕積立金等精算書',
+    {font:fnt(true,16,'FFFFFF'),fill:fill('1E3A6E'),alignment:aln('center')})],36);
+  M(rr,0,rr,2);
+
+  nr([],6);
+
+  // ── 基本情報 ──
+  const sLbl={font:fnt(true,10,'1E3A6E'),fill:fill('EFF6FF'),alignment:aln('center'),border:BD};
+  const sVal={font:fnt(false,10),fill:fill('FFFFFF'),alignment:aln('left'),border:BD};
+
+  if(r.address){
+    rr=nr([cs('物件所在地',sLbl), cs(r.address,{...sVal,font:fnt(false,11)}), null],22); M(rr,1,rr,2);
+  }
+  if(r.buildingName||r.roomNo){
+    rr=nr([cs('物件名称',sLbl), cs(`${r.buildingName||''}${r.roomNo?'　'+r.roomNo:''}`,sVal), null],18); M(rr,1,rr,2);
+  }
+  if(r.sellerName||r.buyerName){
+    rr=nr([cs('売主　/　買主',sLbl), cs(`${r.sellerName||''}　／　${r.buyerName||''}`,sVal), null],18); M(rr,1,rr,2);
+  }
+  rr=nr([cs('引渡日',sLbl), cs(fmtDate(r.year,r.month,r.day),sVal), null],18); M(rr,1,rr,2);
+
+  nr([],8);
+
+  // ── 1. 月額費用 ──
+  const sSec={font:fnt(true,11,'FFFFFF'),fill:fill('1E3A6E'),alignment:aln('left')};
+  rr=nr([cs(`　１．${warekiYear}年 ${r.month}月度　管理費・修繕積立金等金額`,sSec)],22); M(rr,0,rr,2);
+
+  const sRowLbl={font:fnt(true,10,'1E3A6E'),fill:fill('F8FAFC'),alignment:aln('left'),border:BD};
+  const sNum={font:fnt(false,10),fill:fill('FFFFFF'),alignment:aln('right'),border:BD,numFmt:'#,##0"円"'};
+  const sGokei={font:fnt(true,13,'065F46'),fill:fill('D1FAE5'),alignment:aln('center'),border:BD,numFmt:'"¥"#,##0'};
+
+  // 内訳行
+  r.items.forEach(item=>{
+    rr=nr([cs(item.name,sRowLbl), cn(item.amt,sNum), null],18); M(rr,1,rr,2);
+  });
+  // 合計
+  rr=nr([cs('月額 合計',{...sRowLbl,fill:fill('D1FAE5'),font:fnt(true,11,'065F46')}),
+    cn(r.monthly,sGokei), null],24); M(rr,1,rr,2);
+
+  if(breakdownStr){
+    rr=nr([cs(`内訳：${breakdownStr}`,{font:fnt(false,9,'64748B'),fill:fill('F8FAFC'),alignment:aln('left')})],14); M(rr,0,rr,2);
+  }
+
+  nr([],8);
+
+  // ── 2. 日数負担分 ──
+  rr=nr([cs(`　２．日数負担分（引渡月：${r.month}月、月末日：${r.lastDay}日）`,sSec)],22); M(rr,0,rr,2);
+
+  const sTh={font:fnt(true,9,'FFFFFF'),fill:fill('334E6E'),alignment:aln('center'),border:BD};
+  rr=nr([cs('区分',sTh), cs('負担期間',sTh), cs('負担金額',sTh)],20);
+
+  // 売主
+  const sellerPeriodStr = r.sDays>0
+    ? `${r.month}月1日 ～ ${r.month}月${r.day-1}日（${r.sDays}日間）`
+    : '負担なし（引渡日が1日）';
+  const sellerCalcStr = `${fmtN(r.monthly)}円 × ${r.sDays}日 ÷ ${r.lastDay}日（円未満切捨）`;
+  const sSLbl={font:fnt(true,10,'78350F'),fill:fill('FEFCE8'),alignment:aln('center'),border:BD};
+  const sSVal={font:fnt(false,9,'78350F'),fill:fill('FEFCE8'),alignment:aln('left'),border:BD};
+  const sSAmt={font:fnt(true,13,'065F46'),fill:fill('FEFCE8'),alignment:aln('center'),border:BD,numFmt:'"¥"#,##0'};
+  rr=nr([cs('売主',sSLbl), cs(sellerPeriodStr,sSVal), cn(r.sellerDayAmt,sSAmt)],22);
+  rr=nr([cs('',{fill:fill('FEFCE8'),border:BD}), cs(sellerCalcStr,{...sSVal,font:fnt(false,8,'9A3412')}), cs('',{fill:fill('FEFCE8'),border:BD})],14);
+
+  // 買主
+  const buyerPeriodStr = `${r.month}月${r.day}日 ～ ${r.month}月${r.lastDay}日（${r.bDays}日間）`;
+  const buyerCalcStr = `${fmtN(r.monthly)}円 × ${r.bDays}日 ÷ ${r.lastDay}日　（${fmtN(r.monthly)}円 − ${fmtN(r.sellerDayAmt)}円）`;
+  const sBLbl={font:fnt(true,10,'5B21B6'),fill:fill('F5F3FF'),alignment:aln('center'),border:BD};
+  const sBVal={font:fnt(false,9,'5B21B6'),fill:fill('F5F3FF'),alignment:aln('left'),border:BD};
+  const sBAmt={font:fnt(true,13,'065F46'),fill:fill('F5F3FF'),alignment:aln('center'),border:BD,numFmt:'"¥"#,##0'};
+  rr=nr([cs('買主',sBLbl), cs(buyerPeriodStr,sBVal), cn(r.buyerDayAmt,sBAmt)],22);
+  rr=nr([cs('',{fill:fill('F5F3FF'),border:BD}), cs(buyerCalcStr,{...sBVal,font:fnt(false,8,'4C1D95')}), cs('',{fill:fill('F5F3FF'),border:BD})],14);
+
+  nr([],8);
+
+  // ── 3. 決済時精算 ──
+  rr=nr([cs('　３．決済時の精算額（買主 → 売主）',sSec)],22); M(rr,0,rr,2);
+
+  const sKLbl={font:fnt(false,10,'374151'),fill:fill('F8FAFC'),alignment:aln('left'),border:BD};
+  const sKVal={font:fnt(true,11,'1E3A6E'),fill:fill('FFFFFF'),alignment:aln('right'),border:BD,numFmt:'#,##0"円"'};
+  const sKTLbl={font:fnt(true,11,'065F46'),fill:fill('D1FAE5'),alignment:aln('left'),border:BD};
+  const sKTVal={font:fnt(true,14,'065F46'),fill:fill('D1FAE5'),alignment:aln('right'),border:BD,numFmt:'"¥"#,##0'};
+
+  rr=nr([cs(`${r.month}月分（引渡月の買主日割負担）`,sKLbl), cn(r.buyerDayAmt,sKVal), null],20); M(rr,1,rr,2);
+  rr=nr([cs(`${r.nextMonth}月分（翌月分全額）`,sKLbl), cn(r.monthly,sKVal), null],20); M(rr,1,rr,2);
+  rr=nr([cs('決済時 合計支払額',sKTLbl), cn(r.settlementTotal,sKTVal), null],28); M(rr,1,rr,2);
+
+  // 直接請求注記
+  rr=nr([cs(`※ ${r.nextNextMonth}月分より、買主様が管理組合へ直接お支払いとなります。`,
+    {font:fnt(false,9,'0369A1'),fill:fill('F0F9FF'),alignment:aln('left')})],16); M(rr,0,rr,2);
+
+  nr([],10);
+
+  // ── 精算金ボックス ──
+  const boxBg='FEFCE8'; const boxBdr='D97706'; const boxClr='78350F';
+  rr=nr([cs('決済時 精算金（買主 → 売主）',
+    {font:fnt(true,12,boxClr),fill:fill(boxBg),alignment:aln('center'),border:BDm(boxBdr)}),
+    null,
+    cn(r.settlementTotal,{font:fnt(true,18,boxClr),fill:fill(boxBg),alignment:aln('center'),border:BDm(boxBdr),numFmt:'"¥"#,##0'})],38);
+  M(rr,0,rr,1);
+
+  nr([],10);
+
+  // 注記
+  const sNote={font:fnt(false,8,'AAAAAA'),fill:fill('F8FAFC'),alignment:aln('left')};
+  rr=nr([cs(`計算条件：売主負担 ${r.month}月1日〜${r.day-1}日（${r.sDays}日）、買主負担 ${r.month}月${r.day}日〜${r.lastDay}日（${r.bDays}日）、売主日割は円未満切捨`,sNote)],14); M(rr,0,rr,2);
+
+  ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rn,c:2}});
+  ws['!merges']=merges;
+  ws['!cols']=[{wch:32},{wch:22},{wch:18}];
+  ws['!rows']=rowH;
+  ws['!pageSetup']={paperSize:9,orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:1};
+  XLSX.utils.book_append_sheet(wb, ws, '管理費精算書');
+}
+</script>
+</body>
+</html>

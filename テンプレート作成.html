@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>固都税清算表テンプレート作成</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+  <style>
+    body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:#eef2f7;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}
+    .box{background:#fff;border-radius:12px;padding:40px 48px;box-shadow:0 4px 20px rgba(0,0,0,.1);text-align:center;max-width:480px;}
+    h1{font-size:20px;color:#1a3a5c;margin-bottom:12px;}
+    p{font-size:13px;color:#666;line-height:1.8;margin-bottom:28px;}
+    .btn{background:#16a34a;color:#fff;border:none;border-radius:8px;padding:14px 32px;font-size:16px;font-family:inherit;font-weight:bold;cursor:pointer;}
+    .btn:hover{background:#15803d;}
+    .note{font-size:11px;color:#aaa;margin-top:16px;}
+  </style>
+</head>
+<body>
+<div class="box">
+  <h1>固定資産税・都市計画税<br>日割清算表テンプレート</h1>
+  <p>
+    ボタンを押すと Excel テンプレートをダウンロードします。<br>
+    黄色のセルに数値を入力するだけで<br>
+    自動計算・印刷用シートが完成します。
+  </p>
+  <button class="btn" onclick="generate()">&#8595; テンプレートをダウンロード</button>
+  <p class="note">※ インターネット接続が必要です（ライブラリ読み込みのため）</p>
+</div>
+
+<script>
+function generate(){
+  if(typeof XLSX==='undefined'){ alert('ライブラリ読み込み中です。しばらく待ってから再度押してください。'); return; }
+  try{
+    const wb = XLSX.utils.book_new();
+    buildInputSheet(wb);
+    buildPrintSheet(wb, true);   // 売主様控え
+    buildPrintSheet(wb, false);  // 買主様控え
+    XLSX.writeFile(wb,'固都税日割清算表テンプレート.xlsx');
+  }catch(e){
+    alert('エラーが発生しました: '+e.message);
+    console.error(e);
+  }
+}
+
+/* ====================================================
+   スタイル定義
+==================================================== */
+const BD = {top:{style:'thin',color:{rgb:'B0C4DE'}},bottom:{style:'thin',color:{rgb:'B0C4DE'}},left:{style:'thin',color:{rgb:'B0C4DE'}},right:{style:'thin',color:{rgb:'B0C4DE'}}};
+const BDmed = c=>({top:{style:'medium',color:{rgb:c}},bottom:{style:'medium',color:{rgb:c}},left:{style:'medium',color:{rgb:c}},right:{style:'medium',color:{rgb:c}}});
+
+function sf(v,s,f){ return {v:v,t:typeof v==='number'?'n':'s',s:s||{},f:f||undefined}; }
+function sff(formula,s){ return {v:0,t:'n',f:formula,s:s||{}}; }  // number formula
+function sfs(formula,s){ return {v:'',t:'s',f:formula,s:s||{}}; }  // string formula
+
+// 入力セル（黄）
+const sInput = {font:{sz:11,name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'FEFCE8'}},alignment:{horizontal:'left',vertical:'center'},border:BD};
+const sInputC = {font:{sz:11,name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'FEFCE8'}},alignment:{horizontal:'center',vertical:'center'},border:BD,numFmt:'#,##0'};
+const sInputDate = {font:{sz:11,name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'FEFCE8'}},alignment:{horizontal:'left',vertical:'center'},border:BD,numFmt:'yyyy/m/d'};
+const sInputFrac = {font:{sz:10,name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'FEFCE8'}},alignment:{horizontal:'center',vertical:'center'},border:BD,numFmt:'0'};
+
+// 計算セル（水色）
+const sCalc  = {font:{sz:10,name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'EFF6FF'}},alignment:{horizontal:'right',vertical:'center'},border:BD,numFmt:'#,##0'};
+const sCalcL = {font:{sz:10,name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'EFF6FF'}},alignment:{horizontal:'left',vertical:'center'},border:BD};
+const sCalcG = {font:{sz:10,name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'D1FAE5'}},alignment:{horizontal:'right',vertical:'center'},border:BD,numFmt:'#,##0'};
+
+// ラベルセル
+const sLbl = {font:{bold:true,sz:10,color:{rgb:'1E3A6E'},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'DBEAFE'}},alignment:{horizontal:'center',vertical:'center'},border:BD};
+const sHdr = {font:{bold:true,sz:9,color:{rgb:'FFFFFF'},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'334E6E'}},alignment:{horizontal:'center',vertical:'center'},border:BD};
+const sLandHdr = {font:{bold:true,sz:10,color:{rgb:'FFFFFF'},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'2563EB'}},alignment:{horizontal:'left',vertical:'center'}};
+const sBldgHdr = {font:{bold:true,sz:10,color:{rgb:'FFFFFF'},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'7C3AED'}},alignment:{horizontal:'left',vertical:'center'}};
+const sTotalHdr = {font:{bold:true,sz:10,color:{rgb:'FFFFFF'},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'0F766E'}},alignment:{horizontal:'left',vertical:'center'}};
+const sTotalR = {font:{bold:true,sz:11,color:{rgb:'065F46'},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'D1FAE5'}},alignment:{horizontal:'right',vertical:'center'},border:BD,numFmt:'#,##0'};
+const sGray = {font:{sz:9,color:{rgb:'999999'},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'F3F4F6'}},alignment:{horizontal:'center',vertical:'center'},border:BD};
+
+/* ====================================================
+   計算入力シート
+==================================================== */
+function buildInputSheet(wb){
+  const ws = {};
+  const merges = [];
+  const rows = [];
+  let rn = -1;
+
+  function R(cells, hpt){
+    rn++;
+    rows.push({hpt:hpt||15});
+    cells.forEach((cell,ci)=>{ if(cell!=null){ ws[XLSX.utils.encode_cell({r:rn,c:ci})]=cell; } });
+    return rn; // 0-indexed → Excel row = rn+1
+  }
+  function M(r0,c0,r1,c1){ merges.push({s:{r:r0,c:c0},e:{r:r1,c:c1}}); }
+
+  // Excel行番号を返すヘルパ（1-indexed）
+  const XR = n => n+1; // 0-indexed → Excel 1-indexed
+
+  // ── タイトル ──
+  let r = R([sf('固定資産税・都市計画税　日割清算表',{font:{bold:true,sz:16,color:{rgb:'FFFFFF'},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'1E3A6E'}},alignment:{horizontal:'center',vertical:'center'}})],34);
+  M(r,0,r,10);
+
+  r = R([sf('★ 黄色のセルに数値を入力してください',{font:{sz:11,color:{rgb:'B45309'},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'FEF9C3'}},alignment:{horizontal:'center',vertical:'center'}})],20);
+  M(r,0,r,10);
+
+  R([],5); // spacer
+
+  // ── 基本情報入力 ──
+  r = R([sf('物件名',sLbl), sf('',sInput),null,null,null,null,null,null,null,null,null],22);
+  M(r,1,r,10);
+  const ROW_PROP = r; // 物件名 row
+
+  r = R([sf('引渡日',sLbl), sf('',sInputDate),null,null,null,null,null,null,null,null,null],22);
+  M(r,1,r,3);
+  const ROW_DATE = r; // 引渡日 row (Excel: ROW_DATE+1)
+  const CEL_DATE = `B${XR(ROW_DATE)}`; // 例: B5
+
+  R([],5);
+
+  // ── 自動計算エリア ──
+  r = R([sf('【自動計算】',{font:{bold:true,sz:10,color:{rgb:'555555'},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'F1F5F9'}},alignment:{horizontal:'left',vertical:'center'}})],16);
+  M(r,0,r,10);
+
+  r = R([sf('年間日数',sLbl),
+    sff(`IF(${CEL_DATE}="","",IF(MOD(YEAR(${CEL_DATE}),400)=0,366,IF(MOD(YEAR(${CEL_DATE}),100)=0,365,IF(MOD(YEAR(${CEL_DATE}),4)=0,366,365))))`,sCalc),
+    sf('日',{font:{sz:10,name:'メイリオ'},alignment:{horizontal:'left',vertical:'center'}})],18);
+  const CEL_TDAYS = `B${XR(r)}`;
+
+  r = R([sf('売主負担日数',sLbl),
+    sff(`IF(${CEL_DATE}="","",${CEL_DATE}-DATE(YEAR(${CEL_DATE}),1,1))`,sCalc),
+    sf('日',{font:{sz:10,name:'メイリオ'},alignment:{horizontal:'left',vertical:'center'}})],18);
+  const CEL_SDAYS = `B${XR(r)}`;
+
+  r = R([sf('買主負担日数',sLbl),
+    sff(`IF(${CEL_DATE}="","",${CEL_TDAYS}-${CEL_SDAYS})`,sCalc),
+    sf('日',{font:{sz:10,name:'メイリオ'},alignment:{horizontal:'left',vertical:'center'}})],18);
+  const CEL_BDAYS = `B${XR(r)}`;
+
+  r = R([sf('売主負担期間',sLbl),
+    sfs(`IF(${CEL_DATE}="","",IF(${CEL_SDAYS}=0,"負担なし","1月1日〜"&TEXT(${CEL_DATE}-1,"m月d日")&"（"&${CEL_SDAYS}&"日間）"))`,sCalcL)],18);
+  M(r,1,r,10);
+  const CEL_SPER = `B${XR(r)}`;
+
+  r = R([sf('買主負担期間',sLbl),
+    sfs(`IF(${CEL_DATE}="","",TEXT(${CEL_DATE},"m月d日")&"〜12月31日（"&${CEL_BDAYS}&"日間）")`,sCalcL)],18);
+  M(r,1,r,10);
+  const CEL_BPER = `B${XR(r)}`;
+
+  R([],6);
+
+  // ── テーブルヘッダー説明 ──
+  r = R([
+    sf('※ F〜K列は自動計算です。入力不要です。',{font:{sz:9,color:{rgb:'888888'},name:'メイリオ'},alignment:{horizontal:'left',vertical:'center'}})
+  ],14);
+  M(r,0,r,10);
+
+  // ── 土地セクション ──
+  r = R([sf('　◆ 土地（最大3件）',sLandHdr),null,null,null,null,null,null,null,null,null,null],20);
+  M(r,0,r,10);
+
+  // テーブルヘッダー行
+  r = R([
+    sf('名称',sHdr),sf('固定資産税 年額（円）',sHdr),sf('都市計画税 年額（円）',sHdr),
+    sf('持分 分子',sHdr),sf('持分 分母',sHdr),
+    sf('按分後 固定資産税',{...sHdr,fill:{patternType:'solid',fgColor:{rgb:'1D4ED8'}}}),
+    sf('按分後 都市計画税',{...sHdr,fill:{patternType:'solid',fgColor:{rgb:'1D4ED8'}}}),
+    sf('売主負担 固定',{...sHdr,fill:{patternType:'solid',fgColor:{rgb:'065F46'}}}),
+    sf('売主負担 都計',{...sHdr,fill:{patternType:'solid',fgColor:{rgb:'065F46'}}}),
+    sf('買主負担 固定',{...sHdr,fill:{patternType:'solid',fgColor:{rgb:'7C3AED'}}}),
+    sf('買主負担 都計',{...sHdr,fill:{patternType:'solid',fgColor:{rgb:'7C3AED'}}}),
+  ],20);
+
+  // 土地エントリ行を生成
+  const landRows = [];
+  ['土地①','土地②','土地③'].forEach((lbl,i)=>{
+    r = R([
+      sf(lbl,sInput),          // A: 名称
+      sf('',sInputC),          // B: 固定資産税
+      sf('',sInputC),          // C: 都市計画税
+      sf('',sInputFrac),       // D: 持分分子
+      sf('',sInputFrac),       // E: 持分分母
+      null,null,null,null,null,null // F-K: formula (set below)
+    ],20);
+    landRows.push(r);
+    const rx = XR(r);
+    // F: 按分後固定
+    ws[XLSX.utils.encode_cell({r,c:5})] = sff(`IF(B${rx}="","",IF(AND(D${rx}>0,E${rx}>0),ROUND(B${rx}*D${rx}/E${rx},0),B${rx}))`,sCalc);
+    // G: 按分後都計
+    ws[XLSX.utils.encode_cell({r,c:6})] = sff(`IF(C${rx}="","",IF(AND(D${rx}>0,E${rx}>0),ROUND(C${rx}*D${rx}/E${rx},0),C${rx}))`,sCalc);
+    // H: 売主_固定
+    ws[XLSX.utils.encode_cell({r,c:7})] = sff(`IF(F${rx}="","",ROUND(F${rx}*${CEL_SDAYS}/${CEL_TDAYS},0))`,sCalcG);
+    // I: 売主_都計
+    ws[XLSX.utils.encode_cell({r,c:8})] = sff(`IF(G${rx}="","",ROUND(G${rx}*${CEL_SDAYS}/${CEL_TDAYS},0))`,sCalcG);
+    // J: 買主_固定
+    ws[XLSX.utils.encode_cell({r,c:9})] = sff(`IF(F${rx}="","",F${rx}-H${rx})`,{...sCalcG,fill:{patternType:'solid',fgColor:{rgb:'EDE9FE'}}});
+    // K: 買主_都計
+    ws[XLSX.utils.encode_cell({r,c:10})] = sff(`IF(G${rx}="","",G${rx}-I${rx})`,{...sCalcG,fill:{patternType:'solid',fgColor:{rgb:'EDE9FE'}}});
+  });
+
+  // 土地小計
+  r = R([sf('土地 小計',{...sLbl,fill:{patternType:'solid',fgColor:{rgb:'BFDBFE'}}}),sf('',sGray),sf('',sGray),sf('',sGray),sf('',sGray),null,null,null,null,null,null],20);
+  const ROW_LSUB = r;
+  const lFirst=XR(landRows[0]), lLast=XR(landRows[2]);
+  ['F','G','H','I','J','K'].forEach((col,ci)=>{
+    ws[XLSX.utils.encode_cell({r,c:5+ci})] = sff(`SUM(${col}${lFirst}:${col}${lLast})`,{...sCalc,font:{bold:true,sz:10,name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'BFDBFE'}}});
+  });
+
+  R([],5);
+
+  // ── 建物セクション ──
+  r = R([sf('　◆ 建物（最大3件）',sBldgHdr),null,null,null,null,null,null,null,null,null,null],20);
+  M(r,0,r,10);
+
+  r = R([
+    sf('名称',sHdr),sf('固定資産税 年額（円）',sHdr),sf('都市計画税 年額（円）',sHdr),
+    sf('（持分なし）',{...sHdr,fill:{patternType:'solid',fgColor:{rgb:'4B5563'}}}),
+    sf('（持分なし）',{...sHdr,fill:{patternType:'solid',fgColor:{rgb:'4B5563'}}}),
+    sf('按分後 固定資産税',{...sHdr,fill:{patternType:'solid',fgColor:{rgb:'1D4ED8'}}}),
+    sf('按分後 都市計画税',{...sHdr,fill:{patternType:'solid',fgColor:{rgb:'1D4ED8'}}}),
+    sf('売主負担 固定',{...sHdr,fill:{patternType:'solid',fgColor:{rgb:'065F46'}}}),
+    sf('売主負担 都計',{...sHdr,fill:{patternType:'solid',fgColor:{rgb:'065F46'}}}),
+    sf('買主負担 固定',{...sHdr,fill:{patternType:'solid',fgColor:{rgb:'7C3AED'}}}),
+    sf('買主負担 都計',{...sHdr,fill:{patternType:'solid',fgColor:{rgb:'7C3AED'}}}),
+  ],20);
+
+  const bldgRows = [];
+  ['建物①','建物②','建物③'].forEach((lbl)=>{
+    r = R([
+      sf(lbl,sInput),sf('',sInputC),sf('',sInputC),
+      sf('—',sGray),sf('—',sGray),
+      null,null,null,null,null,null
+    ],20);
+    bldgRows.push(r);
+    const rx = XR(r);
+    ws[XLSX.utils.encode_cell({r,c:5})] = sff(`IF(B${rx}="","",B${rx})`,sCalc);
+    ws[XLSX.utils.encode_cell({r,c:6})] = sff(`IF(C${rx}="","",C${rx})`,sCalc);
+    ws[XLSX.utils.encode_cell({r,c:7})] = sff(`IF(F${rx}="","",ROUND(F${rx}*${CEL_SDAYS}/${CEL_TDAYS},0))`,sCalcG);
+    ws[XLSX.utils.encode_cell({r,c:8})] = sff(`IF(G${rx}="","",ROUND(G${rx}*${CEL_SDAYS}/${CEL_TDAYS},0))`,sCalcG);
+    ws[XLSX.utils.encode_cell({r,c:9})] = sff(`IF(F${rx}="","",F${rx}-H${rx})`,{...sCalcG,fill:{patternType:'solid',fgColor:{rgb:'EDE9FE'}}});
+    ws[XLSX.utils.encode_cell({r,c:10})] = sff(`IF(G${rx}="","",G${rx}-I${rx})`,{...sCalcG,fill:{patternType:'solid',fgColor:{rgb:'EDE9FE'}}});
+  });
+
+  // 建物小計
+  r = R([sf('建物 小計',{...sLbl,fill:{patternType:'solid',fgColor:{rgb:'DDD6FE'}}}),sf('',sGray),sf('',sGray),sf('',sGray),sf('',sGray),null,null,null,null,null,null],20);
+  const ROW_BSUB = r;
+  const bFirst=XR(bldgRows[0]), bLast=XR(bldgRows[2]);
+  ['F','G','H','I','J','K'].forEach((col,ci)=>{
+    ws[XLSX.utils.encode_cell({r,c:5+ci})] = sff(`SUM(${col}${bFirst}:${col}${bLast})`,{...sCalc,font:{bold:true,sz:10,name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'DDD6FE'}}});
+  });
+
+  R([],6);
+
+  // ── 合計セクション ──
+  r = R([sf('　◆ 精算合計（土地＋建物）',sTotalHdr),null,null,null,null,null,null,null,null,null,null],22);
+  M(r,0,r,10);
+
+  const LSR=XR(ROW_LSUB), BSR=XR(ROW_BSUB);
+
+  r = R([
+    sf('',sGray),sf('',sGray),sf('',sGray),sf('',sGray),sf('',sGray),
+    sf('按分後年税額',{...sHdr,fill:{patternType:'solid',fgColor:{rgb:'334E6E'}}}),
+    sf('按分後年税額',{...sHdr,fill:{patternType:'solid',fgColor:{rgb:'334E6E'}}}),
+    sf('売主負担 固定',{...sHdr,fill:{patternType:'solid',fgColor:{rgb:'065F46'}}}),
+    sf('売主負担 都計',{...sHdr,fill:{patternType:'solid',fgColor:{rgb:'065F46'}}}),
+    sf('買主負担 固定',{...sHdr,fill:{patternType:'solid',fgColor:{rgb:'7C3AED'}}}),
+    sf('買主負担 都計',{...sHdr,fill:{patternType:'solid',fgColor:{rgb:'7C3AED'}}}),
+  ],18);
+
+  // 売主負担合計
+  r = R([sf('売主負担合計',{...sLbl,fill:{patternType:'solid',fgColor:{rgb:'D1FAE5'}}}),sf('',sGray),sf('',sGray),sf('',sGray),sf('',sGray),
+    sff(`F${LSR}+F${BSR}`,sCalc), sff(`G${LSR}+G${BSR}`,sCalc),
+    sff(`H${LSR}+H${BSR}`,sTotalR), sff(`I${LSR}+I${BSR}`,sTotalR),sf('',sGray),sf('',sGray)],22);
+  const ROW_STOTAL = r;
+
+  // 買主負担合計
+  r = R([sf('買主負担合計',{...sLbl,fill:{patternType:'solid',fgColor:{rgb:'EDE9FE'}}}),sf('',sGray),sf('',sGray),sf('',sGray),sf('',sGray),
+    sf('',sGray),sf('',sGray),sf('',sGray),sf('',sGray),
+    sff(`J${LSR}+J${BSR}`,sTotalR), sff(`K${LSR}+K${BSR}`,sTotalR)],22);
+  const ROW_BTOTAL = r;
+
+  R([],6);
+
+  // 精算金ボックス
+  const STR=XR(ROW_STOTAL), BTR=XR(ROW_BTOTAL);
+  r = R([sf('精算金（買主→売主）',{font:{bold:true,sz:12,color:{rgb:'78350F'},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'FEF9C3'}},alignment:{horizontal:'center',vertical:'center'},border:BDmed('D97706')}),null,null,null,null,null,null,null,null,
+    sff(`J${BTR}+K${BTR}`,{font:{bold:true,sz:14,color:{rgb:'78350F'},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'FEF9C3'}},alignment:{horizontal:'center',vertical:'center'},border:BDmed('D97706'),numFmt:'#,##0'}),
+    sf('円',{font:{bold:true,sz:12,color:{rgb:'78350F'},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'FEF9C3'}},alignment:{horizontal:'left',vertical:'center'},border:BDmed('D97706')})],30);
+  M(r,0,r,8); M(r,9,r,9);
+
+  R([],8);
+
+  // 計算条件
+  r = R([sf('【計算条件】起算日：1月1日　引渡日の負担：買主負担　端数処理：四捨五入',{font:{sz:9,color:{rgb:'AAAAAA'},name:'メイリオ'},alignment:{horizontal:'left',vertical:'center'}})],14);
+  M(r,0,r,10);
+
+  // シート設定
+  ws['!ref'] = XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rn,c:10}});
+  ws['!merges'] = merges;
+  ws['!cols'] = [{wch:14},{wch:14},{wch:14},{wch:9},{wch:9},{wch:13},{wch:13},{wch:13},{wch:13},{wch:13},{wch:13}];
+  ws['!rows'] = rows;
+
+  // 印刷設定
+  ws['!pageSetup'] = {paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0};
+
+  XLSX.utils.book_append_sheet(wb, ws, '計算入力');
+
+  // 外部から参照できるようにセルアドレスを返す
+  return {
+    CEL_DATE, CEL_TDAYS, CEL_SDAYS, CEL_BDAYS, CEL_SPER, CEL_BPER,
+    ROW_PROP, ROW_DATE,
+    landRows, bldgRows, ROW_LSUB, ROW_BSUB, ROW_STOTAL, ROW_BTOTAL
+  };
+}
+
+/* ====================================================
+   印刷用シート（売主様控え・買主様控え）
+==================================================== */
+function buildPrintSheet(wb, isSeller){
+  const ws = {};
+  const merges = [];
+  const rows2 = [];
+  let rn = -1;
+  const SN = '計算入力'; // 参照元シート名
+
+  function R(cells, hpt){
+    rn++;
+    rows2.push({hpt:hpt||15});
+    cells.forEach((cell,ci)=>{ if(cell!=null){ ws[XLSX.utils.encode_cell({r:rn,c:ci})]=cell; } });
+    return rn;
+  }
+  function M(r0,c0,r1,c1){ merges.push({s:{r:r0,c:c0},e:{r:r1,c:c1}}); }
+  function ref(cell){ return `'${SN}'!${cell}`; }
+
+  // スタイル
+  const sSec = bg=>({font:{bold:true,sz:10,color:{rgb:'FFFFFF'},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:bg}},alignment:{horizontal:'left',vertical:'center'}});
+  const sSecTbl = bg=>({font:{bold:true,sz:9,color:{rgb:'FFFFFF'},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:bg}},alignment:{horizontal:'center',vertical:'center'},border:BD});
+  const sYr = bg=>({font:{sz:10,name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:bg}},alignment:{horizontal:'right',vertical:'center'},border:BD,numFmt:'#,##0'});
+  const sYrL = bg=>({font:{sz:10,color:{rgb:'777777'},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:bg}},alignment:{horizontal:'left',vertical:'center'},border:BD});
+  const sTtl = bg=>({font:{bold:true,sz:12,color:{rgb:'065F46'},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:bg}},alignment:{horizontal:'right',vertical:'center'},border:BD,numFmt:'#,##0'});
+
+  const sBg = isSeller?'FEFCE8':'FFFFFF';
+  const bBg = !isSeller?'FFF7ED':'FFFFFF';
+
+  // ─ タイトル ─
+  let r = R([sf('固定資産税・都市計画税　精算書',{font:{bold:true,sz:17,color:{rgb:'FFFFFF'},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'1E3A6E'}},alignment:{horizontal:'center',vertical:'center'}})],36);
+  M(r,0,r,4);
+
+  r = R([sf(isSeller?'売主様　控え':'買主様　控え',{font:{bold:true,sz:12,color:{rgb:'1E3A6E'},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'DBEAFE'}},alignment:{horizontal:'right',vertical:'center'}})],22);
+  M(r,0,r,4);
+
+  R([],5);
+
+  // ─ 物件情報 ─
+  const sLbl2 = {font:{bold:true,sz:10,color:{rgb:'1E3A6E'},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'EFF6FF'}},alignment:{horizontal:'center',vertical:'center'},border:BD};
+  const sVal2 = {font:{sz:10,name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'FFFFFF'}},alignment:{horizontal:'left',vertical:'center'},border:BD};
+  const sVal2R = {font:{sz:10,name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:'FFFFFF'}},alignment:{horizontal:'right',vertical:'center'},border:BD};
+
+  r = R([sf('物件名',sLbl2), sfs(ref('B4'),{...sVal2,font:{sz:11,name:'メイリオ'}}),null,null,null],22);
+  M(r,1,r,4);
+
+  r = R([sf('引渡日',sLbl2), sfs(ref('B5'),{...sVal2,numFmt:'yyyy/m/d'}), sf('対象年度',sLbl2), sfs(`=YEAR('${SN}'!B5)&"年度"`,sVal2),null],20);
+  M(r,3,r,4);
+
+  r = R([sf('年間日数',sLbl2), sff(ref(`B${findRow(wb,'計算入力','年間日数')}`),{...sVal2R,numFmt:'0"日"'}), sf('売主負担日数',sLbl2), sff(ref(`B${findRow(wb,'計算入力','売主負担日数')}`),{...sVal2R,numFmt:'0"日"'}),null],20);
+  M(r,3,r,4);
+
+  // 期間情報は文字列でそのまま参照
+  // 動的参照のため固定行番号を使う（計算入力シートの固定構造に依存）
+  // 計算入力シートで: 年間日数=B8, 売主日数=B9, 買主日数=B10, 売主期間=B11, 買主期間=B12
+  r = R([sf('売主負担期間',sLbl2), sfs(`='${SN}'!B11`,sVal2),null,null,null],20);
+  M(r,1,r,4);
+
+  r = R([sf('買主負担期間',sLbl2), sfs(`='${SN}'!B12`,sVal2),null,null,null],20);
+  M(r,1,r,4);
+
+  R([],6);
+
+  // ─ 精算内訳ヘッダー ─
+  r = R([sf('　精算内訳',sSec('1E3A6E')),null,null,null,null],22);
+  M(r,0,r,4);
+
+  r = R([sf('区分',sSecTbl('334E6E')),sf('負担期間',sSecTbl('334E6E')),sf('固定資産税（円）',sSecTbl('334E6E')),sf('都市計画税（円）',sSecTbl('334E6E')),sf('合計（円）',sSecTbl('334E6E'))],20);
+
+  // 土地エントリ（計算入力の各行を参照）
+  // 土地① row = 土地ヘッダー行+2 (0-indexed)
+  // 計算入力シートの構造: 土地①はrow index 16相当 → Excel行17
+  // ただし動的に計算するより固定で参照する
+  // 計算入力の行構造（Excel行番号, 1-indexed）:
+  // 土地①: 16, 土地②: 17, 土地③: 18
+  // 建物①: 23, 建物②: 24, 建物③: 25
+  // ※ buildInputSheetで生成した行の実際の番号に合わせる必要あり
+  // → 関数の戻り値から landRows を使う。ただしこの関数は戻り値を持たないため、
+  //    固定の行番号を使う（buildInputSheetの構造が変わったら要修正）
+  // 構造から計算:
+  // r=0:title, r=1:inst, r=2:spacer, r=3:prop, r=4:date, r=5:spacer
+  // r=6:auto header, r=7:tdays, r=8:sdays, r=9:bdays, r=10:sper, r=11:bper
+  // r=12:spacer, r=13:col note, r=14:land sec, r=15:land hdr
+  // r=16:土地①, r=17:土地②, r=18:土地③, r=19:土地subtotal
+  // r=20:spacer, r=21:bldg sec, r=22:bldg hdr
+  // r=23:建物①, r=24:建物②, r=25:建物③, r=26:bldg subtotal
+  const L1=17, L2=18, L3=19; // Excel行番号（1-indexed）
+  const B1=24, B2=25, B3=26;
+  const LS=20, BS=27; // 小計行
+
+  function addLandEntry(lbl, exRow){
+    const xr = exRow;
+    // 持分情報
+    const fracStr = `=IF(AND('${SN}'!D${xr}>0,'${SN}'!E${xr}>0),"（持分："&'${SN}'!D${xr}&"／"&'${SN}'!E${xr}&"）","")`;
+
+    r = R([sfs(`="　◆ "&'${SN}'!A${xr}&${fracStr}`,sSec('2563EB')),null,null,null,null],18);
+    M(r,0,r,4);
+
+    // 年税額
+    r = R([sf('　年税額',{...sYrL('EFF6FF')}),sf('—',{...sYrL('EFF6FF'),alignment:{horizontal:'center',vertical:'center'}}),
+      sff(`='${SN}'!F${xr}`,sYr('EFF6FF')), sff(`='${SN}'!G${xr}`,sYr('EFF6FF')),
+      sff(`='${SN}'!F${xr}+'${SN}'!G${xr}`,sYr('EFF6FF'))],18);
+
+    // 売主負担
+    r = R([sf('　売主負担',{...sYrL(sBg),font:{bold:isSeller,sz:10,name:'メイリオ'}}),
+      sfs(`='${SN}'!B11`,{...sYrL(sBg),font:{sz:8,color:{rgb:'777777'},name:'メイリオ'}}),
+      sff(`='${SN}'!H${xr}`,sYr(sBg)), sff(`='${SN}'!I${xr}`,sYr(sBg)),
+      sff(`='${SN}'!H${xr}+'${SN}'!I${xr}`,sYr(sBg))],18);
+
+    // 買主負担
+    r = R([sf('　買主負担',{...sYrL(bBg),font:{bold:!isSeller,sz:10,name:'メイリオ'}}),
+      sfs(`='${SN}'!B12`,{...sYrL(bBg),font:{sz:8,color:{rgb:'777777'},name:'メイリオ'}}),
+      sff(`='${SN}'!J${xr}`,sYr(bBg)), sff(`='${SN}'!K${xr}`,sYr(bBg)),
+      sff(`='${SN}'!J${xr}+'${SN}'!K${xr}`,sYr(bBg))],18);
+  }
+
+  function addBldgEntry(lbl, exRow){
+    const xr = exRow;
+    r = R([sfs(`="　◆ "&'${SN}'!A${xr}`,sSec('7C3AED')),null,null,null,null],18);
+    M(r,0,r,4);
+
+    r = R([sf('　年税額',sYrL('F5F3FF')),sf('—',{...sYrL('F5F3FF'),alignment:{horizontal:'center',vertical:'center'}}),
+      sff(`='${SN}'!F${xr}`,sYr('F5F3FF')), sff(`='${SN}'!G${xr}`,sYr('F5F3FF')),
+      sff(`='${SN}'!F${xr}+'${SN}'!G${xr}`,sYr('F5F3FF'))],18);
+
+    r = R([sf('　売主負担',{...sYrL(sBg),font:{bold:isSeller,sz:10,name:'メイリオ'}}),
+      sfs(`='${SN}'!B11`,{...sYrL(sBg),font:{sz:8,color:{rgb:'777777'},name:'メイリオ'}}),
+      sff(`='${SN}'!H${xr}`,sYr(sBg)), sff(`='${SN}'!I${xr}`,sYr(sBg)),
+      sff(`='${SN}'!H${xr}+'${SN}'!I${xr}`,sYr(sBg))],18);
+
+    r = R([sf('　買主負担',{...sYrL(bBg),font:{bold:!isSeller,sz:10,name:'メイリオ'}}),
+      sfs(`='${SN}'!B12`,{...sYrL(bBg),font:{sz:8,color:{rgb:'777777'},name:'メイリオ'}}),
+      sff(`='${SN}'!J${xr}`,sYr(bBg)), sff(`='${SN}'!K${xr}`,sYr(bBg)),
+      sff(`='${SN}'!J${xr}+'${SN}'!K${xr}`,sYr(bBg))],18);
+  }
+
+  addLandEntry('土地①', L1);
+  addLandEntry('土地②', L2);
+  addLandEntry('土地③', L3);
+  addBldgEntry('建物①', B1);
+  addBldgEntry('建物②', B2);
+  addBldgEntry('建物③', B3);
+
+  R([],6);
+
+  // ─ 精算合計 ─
+  r = R([sf('　精算合計（土地＋建物）',sSec('0F766E')),null,null,null,null],22);
+  M(r,0,r,4);
+
+  const stBg = isSeller?'FEFCE8':'F0FDF4';
+  r = R([sf('売主負担合計',{font:{bold:true,sz:11,color:{rgb:'065F46'},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:stBg}},alignment:{horizontal:'left',vertical:'center'},border:BD}),
+    sf(isSeller?'← ご受取額':'売主のご受取額',{font:{bold:isSeller,sz:10,color:{rgb:isSeller?'B45309':'888888'},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:stBg}},alignment:{horizontal:'center',vertical:'center'},border:BD}),
+    sff(`='${SN}'!H${LS}+'${SN}'!H${BS}`,sTtl(stBg)),
+    sff(`='${SN}'!I${LS}+'${SN}'!I${BS}`,sTtl(stBg)),
+    sff(`='${SN}'!H${LS}+'${SN}'!H${BS}+'${SN}'!I${LS}+'${SN}'!I${BS}`,sTtl(stBg))],24);
+
+  const btBg = !isSeller?'FFF7ED':'F0FDF4';
+  r = R([sf('買主負担合計',{font:{bold:true,sz:11,color:{rgb:'065F46'},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:btBg}},alignment:{horizontal:'left',vertical:'center'},border:BD}),
+    sf(!isSeller?'← お支払額':'買主のお支払額',{font:{bold:!isSeller,sz:10,color:{rgb:!isSeller?'B45309':'888888'},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:btBg}},alignment:{horizontal:'center',vertical:'center'},border:BD}),
+    sff(`='${SN}'!J${LS}+'${SN}'!J${BS}`,sTtl(btBg)),
+    sff(`='${SN}'!K${LS}+'${SN}'!K${BS}`,sTtl(btBg)),
+    sff(`='${SN}'!J${LS}+'${SN}'!J${BS}+'${SN}'!K${LS}+'${SN}'!K${BS}`,sTtl(btBg))],24);
+  const ROW_BUYER_TOTAL = r;
+
+  R([],8);
+
+  // ─ 精算金ボックス ─
+  const boxBg  = isSeller?'FEFCE8':'FFF1F2';
+  const boxBdr = isSeller?'D97706':'E11D48';
+  const boxClr = isSeller?'78350F':'9F1239';
+  const settleFormula = `='${SN}'!J${LS}+'${SN}'!J${BS}+'${SN}'!K${LS}+'${SN}'!K${BS}`;
+  const boxPfx = isSeller?'精算金　':'精算金　';
+  const boxSfx = isSeller?'　を買主様よりお受け取りください':'　を売主様へお支払いください';
+  r = R([sf(isSeller?`精算金（受取）`:`精算金（お支払い）`,{font:{bold:true,sz:12,color:{rgb:boxClr},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:boxBg}},alignment:{horizontal:'center',vertical:'center'},border:BDmed(boxBdr)}),null,null,null,
+    sff(settleFormula,{font:{bold:true,sz:16,color:{rgb:boxClr},name:'メイリオ'},fill:{patternType:'solid',fgColor:{rgb:boxBg}},alignment:{horizontal:'center',vertical:'center'},border:BDmed(boxBdr),numFmt:'"￥"#,##0'})],34);
+  M(r,0,r,3);
+
+  R([],8);
+
+  // ─ 計算条件 ─
+  r = R([sf('起算日：1月1日　｜　引渡日の負担：買主負担　｜　端数処理：四捨五入',{font:{sz:9,color:{rgb:'AAAAAA'},name:'メイリオ'},alignment:{horizontal:'center',vertical:'center'}})],14);
+  M(r,0,r,4);
+
+  // シート設定
+  ws['!ref'] = XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rn,c:4}});
+  ws['!merges'] = merges;
+  ws['!cols'] = [{wch:16},{wch:28},{wch:14},{wch:14},{wch:14}];
+  ws['!rows'] = rows2;
+  ws['!pageSetup'] = {paperSize:9,orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:1};
+
+  XLSX.utils.book_append_sheet(wb, ws, isSeller?'売主様控え':'買主様控え');
+}
+
+// ダミー関数（buildInputSheetの戻り値が不要なため固定行番号を使う）
+function findRow(wb, sheetName, label){ return 8; } // 使用しない（ハードコード）
+</script>
+</body>
+</html>
