@@ -769,6 +769,61 @@ function buildSeisanSheet(wb, r){
     M(rr,0,rr,5);
   }
 
+  nr([],8);
+
+  // ── 売主・買主 負担額内訳 ──
+  // ヘッダ（項目 | 売主様 | 買主様）
+  const sBTH ={font:fnt(true,10,'FFFFFF'),fill:fill('334E6E'),alignment:aln('center'),border:BD};
+  const sBTHS={font:fnt(true,10,'FFFFFF'),fill:fill('7F1D1D'),alignment:aln('center'),border:BD};
+  const sBTHB={font:fnt(true,10,'FFFFFF'),fill:fill('1E3A6E'),alignment:aln('center'),border:BD};
+  rr=nr([cs('売主様・買主様　負担額内訳',sBTH),null,null,cs('売主様 負担額',sBTHS),null,cs('買主様 負担額',sBTHB)],22);
+  M(rr,0,rr,2); M(rr,3,rr,4);
+
+  // データ行スタイル
+  const sBTL ={font:fnt(true,9,'334E6E'),fill:fill('F8FAFC'),alignment:aln('left'),border:BD};
+  const sBTS ={font:fnt(true,11,'7F1D1D'),fill:fill('FFF1F2'),alignment:aln('right'),border:BD,numFmt:'"金 "#,##0"円"'};
+  const sBTBv={font:fnt(true,11,'1E3A6E'),fill:fill('EFF6FF'),alignment:aln('right'),border:BD,numFmt:'"金 "#,##0"円"'};
+
+  // 土地行（数式で参照）
+  const rowBTLand=nr([cs('土地（固定＋都市）　…①',sBTL),null,null,
+    cf(`C${R(rowLandFormula)}-F${R(rowLandFormula)}`,r.sellerLandAmt,sBTS),null,
+    cf(`F${R(rowLandFormula)}`,r.buyerLandAmt,sBTBv)
+  ],20);
+  M(rowBTLand,0,rowBTLand,2); M(rowBTLand,3,rowBTLand,4);
+
+  // 建物行
+  const rowBTBldg=nr([cs('建物（固定＋都市）　…②',sBTL),null,null,
+    cf(`C${R(rowBldgFormula)}-F${R(rowBldgFormula)}`,r.sellerBldgAmt,sBTS),null,
+    cf(`F${R(rowBldgFormula)}`,r.buyerBldgAmt,sBTBv)
+  ],20);
+  M(rowBTBldg,0,rowBTBldg,2); M(rowBTBldg,3,rowBTBldg,4);
+
+  // 消費税行（業者のみ）
+  let rowBTCtax;
+  if(r.isVendor){
+    const sBTDash={font:fnt(false,9,'AAAAAA'),fill:fill('FFF1F2'),alignment:aln('center'),border:BD};
+    const sBTCTB={font:fnt(true,11,'166534'),fill:fill('F0FDF4'),alignment:aln('right'),border:BD,numFmt:'"金 "#,##0"円"'};
+    rowBTCtax=nr([cs(`建物消費税（${r.consumptionTaxRate}%）　…③`,{...sBTL,font:fnt(true,9,'166534')}),null,null,
+      cs('—',sBTDash),null,
+      cf(`F${R(rowCtaxFormula)}`,r.ctaxAmt,sBTCTB)
+    ],20);
+    M(rowBTCtax,0,rowBTCtax,2); M(rowBTCtax,3,rowBTCtax,4);
+  }
+
+  // 合計行
+  const sBTTS={font:fnt(true,13,'7F1D1D'),fill:fill('FEE2E2'),alignment:aln('right'),border:BDm('DC2626'),numFmt:'"金 "#,##0"円"'};
+  const sBTTB={font:fnt(true,13,'1E3A6E'),fill:fill('DBEAFE'),alignment:aln('right'),border:BDm('2563EB'),numFmt:'"金 "#,##0"円"'};
+  const sBTTL={font:fnt(true,10,'334E6E'),fill:fill('F0F4F8'),alignment:aln('left'),border:BD};
+  const sellerTotalF=`D${R(rowBTLand)}+D${R(rowBTBldg)}`;
+  const buyerTotalF =r.isVendor
+    ? `F${R(rowBTLand)}+F${R(rowBTBldg)}+F${R(rowBTCtax)}`
+    : `F${R(rowBTLand)}+F${R(rowBTBldg)}`;
+  rr=nr([cs('合　計',sBTTL),null,null,
+    cf(sellerTotalF,r.sellerSubTotal,sBTTS),null,
+    cf(buyerTotalF,r.buyerFinalAmt,sBTTB)
+  ],28);
+  M(rr,0,rr,2); M(rr,3,rr,4);
+
   nr([],10);
 
   // ── 精算金ボックス ──
