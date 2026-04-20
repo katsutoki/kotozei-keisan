@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>固定資産税・都市計画税 日割精算書</title>
+  <title>固定資産税・都市計画税 精算書</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;}
@@ -11,18 +11,16 @@
     .container{max-width:820px;margin:0 auto;}
 
     header{text-align:center;margin-bottom:24px;}
-    header h1{font-size:22px;color:#1a3a5c;font-weight:bold;line-height:1.5;}
+    header h1{font-size:20px;color:#1a3a5c;font-weight:bold;line-height:1.5;}
     header p{font-size:12px;color:#888;margin-top:6px;}
 
     .card{background:#fff;border-radius:10px;padding:22px;margin-bottom:18px;box-shadow:0 2px 10px rgba(0,0,0,.08);}
     .card-title{font-size:15px;font-weight:bold;color:#1a3a5c;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid #e2eaf5;display:flex;align-items:center;gap:8px;}
 
     .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-    .form-grid.col3{grid-template-columns:1fr 1fr 1fr;}
     .form-grid .full{grid-column:1/-1;}
 
     label.lbl{display:block;font-size:12px;font-weight:bold;color:#555;margin-bottom:4px;}
-    .required{color:#e53e3e;margin-left:2px;}
     .optional{color:#aaa;font-weight:normal;font-size:10px;margin-left:3px;}
     .hint{font-size:10px;color:#888;margin-top:3px;line-height:1.6;}
     .error-msg{color:#e53e3e;font-size:11px;margin-top:2px;display:none;}
@@ -35,15 +33,20 @@
     .sec-box{border:1.5px solid #d0d9e8;border-radius:8px;padding:16px;margin-bottom:14px;background:#fafbfd;}
     .sec-box.land{border-color:#bfdbfe;background:#eff6ff;}
     .sec-box.bldg{border-color:#ddd6fe;background:#f5f3ff;}
-    .sec-box.override{border-color:#fed7aa;background:#fff7ed;}
-    .sec-head{font-size:13px;font-weight:bold;color:#fff;padding:6px 14px;border-radius:6px;margin-bottom:12px;display:flex;align-items:center;gap:6px;}
+    .sec-box.tax{border-color:#86efac;background:#f0fdf4;}
+    .sec-head{font-size:13px;font-weight:bold;color:#fff;padding:6px 14px;border-radius:6px;margin-bottom:12px;}
     .sec-head.land{background:#2563eb;}
     .sec-head.bldg{background:#7c3aed;}
-    .sec-head.override{background:#ea580c;}
+    .sec-head.tax{background:#16a34a;}
 
     .frac-row{display:flex;align-items:center;gap:6px;}
     .frac-row input{flex:1;text-align:center;}
     .frac-div{font-size:18px;color:#94a3b8;flex-shrink:0;}
+
+    .seller-type-row{display:flex;gap:20px;align-items:center;margin-bottom:12px;flex-wrap:wrap;}
+    .seller-type-row label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:bold;color:#374151;cursor:pointer;}
+    .seller-type-row input[type=radio]{width:auto;cursor:pointer;}
+    #taxRateField{display:none;margin-top:10px;max-width:220px;}
 
     .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 20px;border:none;border-radius:7px;font-size:14px;font-family:inherit;font-weight:bold;cursor:pointer;transition:background .2s,transform .1s;}
     .btn:active{transform:scale(.98);}
@@ -58,54 +61,92 @@
     #resultArea{display:none;}
     .result-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;}
 
+    /* PDF形式の精算書スタイル */
     .seisan-wrap{border:1.5px solid #b0c4de;border-radius:8px;overflow:hidden;margin-bottom:16px;}
+    .seisan-doc-title{background:#1e3a6e;color:#fff;text-align:center;padding:10px;font-size:15px;font-weight:bold;letter-spacing:.08em;}
+    .seisan-property{background:#dbeafe;color:#1e3a6e;text-align:center;padding:10px 16px;font-size:17px;font-weight:bold;}
+    .seisan-info{background:#eff6ff;padding:8px 16px;font-size:11px;color:#1e40af;line-height:1.9;border-bottom:1px solid #bfdbfe;}
 
-    /* タイトル行 */
-    .seisan-title{background:#1e3a6e;color:#fff;text-align:center;padding:12px;font-size:16px;font-weight:bold;letter-spacing:.05em;}
-    .seisan-info{background:#eff6ff;padding:10px 16px;font-size:12px;color:#1e40af;line-height:1.9;border-bottom:1px solid #bfdbfe;}
+    /* セクションヘッダ（1. 令和X年度...） */
+    .section-header{display:flex;align-items:center;gap:8px;padding:10px 16px;background:#f8fafc;border-bottom:1px solid #e2eaf5;flex-wrap:wrap;}
+    .section-num{font-size:13px;font-weight:bold;color:#1e3a6e;}
+    .section-title{font-size:13px;font-weight:bold;color:#1e3a6e;flex:1;}
+    .section-eq{font-size:14px;color:#64748b;margin:0 4px;}
+    .section-total{font-size:15px;font-weight:bold;color:#1e3a6e;}
 
-    /* 課税標準テーブル */
-    .seisan-table{width:100%;border-collapse:collapse;font-size:13px;}
-    .seisan-table th{padding:8px 10px;font-weight:bold;font-size:11px;text-align:center;background:#334e6e;color:#fff;border:1px solid #4a6a8e;}
-    .seisan-table th.left{text-align:left;}
-    .seisan-table td{padding:8px 10px;border:1px solid #d0d9e8;text-align:right;vertical-align:middle;}
-    .seisan-table td.row-label{text-align:left;background:#f8fafc;font-weight:bold;color:#1e3a6e;white-space:nowrap;}
-    .seisan-table tr.row-total td{background:#dbeafe;font-weight:bold;color:#1e40af;}
-    .seisan-table tr.row-rate td{background:#f1f5f9;color:#475569;}
-    .seisan-table tr.row-nengaku td{background:#f8fafc;color:#374151;}
-    .seisan-table tr.row-gokei td{background:#d1fae5;font-weight:bold;color:#065f46;font-size:14px;}
+    /* 4列年税額テーブル */
+    .tax4-wrap{padding:12px 16px;}
+    .tax4-table{width:100%;border-collapse:collapse;font-size:12px;}
+    .tax4-table th{padding:7px 6px;background:#334e6e;color:#fff;text-align:center;border:1px solid #4a6a8e;font-size:11px;line-height:1.4;}
+    .tax4-table td{padding:8px 6px;border:1px solid #d0d9e8;text-align:right;}
+    .tax4-table td.lbl-cell{text-align:center;background:#f0f4f8;font-weight:bold;font-size:11px;color:#334e6e;}
+    .tax4-table .land-col{background:#eff6ff;color:#1e40af;}
+    .tax4-table .bldg-col{background:#f5f3ff;color:#5b21b6;}
 
-    /* 負担計算部分 */
-    .futan-box{padding:14px 16px;border-top:2px solid #b0c4de;background:#fafbfd;}
-    .futan-title{font-size:12px;font-weight:bold;color:#334e6e;margin-bottom:10px;letter-spacing:.03em;}
-    .futan-row{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;font-size:13px;padding:8px 12px;border-radius:6px;}
-    .futan-row.seller{background:#fefce8;border:1px solid #fde68a;}
-    .futan-row.buyer{background:#fdf4ff;border:1px solid #e9d5ff;}
-    .futan-party{font-weight:bold;min-width:42px;color:#1e3a6e;}
-    .futan-period{color:#64748b;font-size:11px;flex:1;}
-    .futan-calc{color:#374151;font-size:12px;}
-    .futan-amount{font-weight:bold;font-size:15px;color:#1e3a6e;white-space:nowrap;margin-left:auto;}
+    /* 負担日数区分・日割清算式 のサブセクション */
+    .subsec-wrap{padding:10px 16px;border-top:1px solid #e8edf5;}
+    .subsec-title{font-size:12px;font-weight:bold;color:#334e6e;margin-bottom:8px;}
 
-    /* 精算金ボックス */
-    .settle-box{background:#fef9c3;border:2px solid #d97706;border-radius:8px;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;margin-top:12px;flex-wrap:wrap;gap:8px;}
-    .settle-label{font-size:13px;font-weight:bold;color:#78350f;}
-    .settle-amount{font-size:26px;font-weight:bold;color:#78350f;}
+    .days-table{font-size:13px;line-height:2.0;}
+    .days-row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
+    .dl{color:#555;min-width:110px;font-size:12px;}
+    .dd{font-size:13px;}
+    .dd strong{font-size:18px;color:#1e3a6e;}
+    .dp{color:#555;font-size:12px;}
+
+    /* 日割り清算式テーブル */
+    .formula-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:6px;}
+    .formula-table tr{border-bottom:1px solid #f0f0f0;}
+    .formula-table td{padding:6px 4px;vertical-align:middle;}
+    .fm-item{font-weight:bold;color:#1e3a6e;width:120px;}
+    .fm-label{color:#666;width:54px;font-size:11px;}
+    .fm-amt{text-align:right;min-width:80px;color:#333;}
+    .fm-op{text-align:center;color:#94a3b8;width:18px;font-size:14px;}
+    .fm-days{text-align:center;color:#1e3a6e;font-weight:bold;width:32px;font-size:14px;}
+    .fm-yr{text-align:center;color:#555;width:36px;}
+    .fm-eq{text-align:center;color:#94a3b8;width:18px;font-size:14px;}
+    .fm-result{text-align:right;font-weight:bold;color:#1e3a6e;min-width:90px;}
+    .fm-idx{text-align:right;color:#2563eb;font-weight:bold;padding-left:6px;white-space:nowrap;}
+
+    .formula-note{font-size:11px;color:#9a3412;line-height:1.9;margin-top:4px;}
+    .formula-ctax-note{font-size:11px;color:#166534;line-height:1.9;margin-top:2px;}
+
+    /* 精算金バー */
+    .settle-bar{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:#fef9c3;border-top:2px solid #d97706;flex-wrap:wrap;gap:8px;}
+    .settle-bar-label{font-size:13px;font-weight:bold;color:#78350f;}
+    .settle-bar-amount{font-size:20px;font-weight:bold;color:#78350f;}
+    .settle-bar-idx{font-size:12px;color:#92400e;margin-left:4px;}
+
+    /* 売主・買主 負担額内訳テーブル */
+    .burden-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px;}
+    .burden-table th{padding:7px 8px;text-align:center;font-size:11px;line-height:1.4;}
+    .bt-item{background:#334e6e;color:#fff;border:1px solid #4a6a8e;width:38%;}
+    .bt-seller{background:#7f1d1d;color:#fff;border:1px solid #991b1b;width:31%;}
+    .bt-buyer{background:#1e3a6e;color:#fff;border:1px solid #1e40af;width:31%;}
+    .bt-label{padding:8px 10px;border:1px solid #d0d9e8;background:#f8fafc;color:#334e6e;font-weight:bold;font-size:11px;}
+    .bt-seller-val{padding:8px 10px;border:1px solid #fca5a5;background:#fff1f2;text-align:right;color:#991b1b;font-weight:bold;}
+    .bt-buyer-val{padding:8px 10px;border:1px solid #93c5fd;background:#eff6ff;text-align:right;color:#1e3a6e;font-weight:bold;}
+    .bt-total-row .bt-label{background:#f0f4f8;font-size:12px;font-weight:bold;}
+    .bt-seller-total{padding:10px;border:1.5px solid #dc2626;background:#fee2e2;text-align:right;color:#7f1d1d;font-weight:bold;font-size:14px;}
+    .bt-buyer-total{padding:10px;border:1.5px solid #2563eb;background:#dbeafe;text-align:right;color:#1e3a6e;font-weight:bold;font-size:14px;}
 
     .note{font-size:11px;color:#999;margin-top:12px;line-height:1.8;padding:10px 12px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;}
 
     @media(max-width:600px){
-      .form-grid,.form-grid.col3{grid-template-columns:1fr;}
-      .seisan-title{font-size:14px;}
-      .futan-row{flex-direction:column;gap:4px;}
-      .futan-amount{margin-left:0;}
+      .form-grid{grid-template-columns:1fr;}
+      .tax4-table{font-size:10px;}
+      .tax4-table th,.tax4-table td{padding:5px 3px;}
+      .formula-table{font-size:11px;}
+      .fm-item{width:90px;}
+      .settle-bar{flex-direction:column;align-items:flex-start;}
     }
   </style>
 </head>
 <body>
 <div class="container">
   <header>
-    <h1>固定資産税・都市計画税　日割精算書</h1>
-    <p>起算日：1月1日　｜　引渡日：買主負担　｜　端数処理：売主負担額 円未満切捨</p>
+    <h1>固定資産税・都市計画税　精算書作成ツール</h1>
+    <p>評価証明書（その2）の「固定資産税相当額／都市計画税相当額」をそのまま入力してください</p>
   </header>
 
   <!-- 基本情報 -->
@@ -113,8 +154,12 @@
     <div class="card-title">&#128197; 基本情報</div>
     <div class="form-grid">
       <div class="full">
+        <label class="lbl">物件名<span class="optional">任意</span></label>
+        <input type="text" id="propertyName" placeholder="例：西野パークハウス">
+      </div>
+      <div class="full">
         <label class="lbl">物件所在地<span class="optional">任意</span></label>
-        <input type="text" id="address" placeholder="例：札幌市中央区○○町1丁目2番地3号">
+        <input type="text" id="address" placeholder="例：札幌市西区西野4条1丁目">
       </div>
       <div>
         <label class="lbl">売主氏名<span class="optional">任意</span></label>
@@ -125,32 +170,43 @@
         <input type="text" id="buyerName" placeholder="例：鈴木 花子">
       </div>
       <div>
-        <label class="lbl">引渡日<span class="required">*</span></label>
+        <label class="lbl">引渡日<span style="color:#e53e3e;margin-left:2px;">*</span></label>
         <input type="date" id="settlementDate">
         <span class="error-msg" id="err-date">引渡日を入力してください。</span>
       </div>
       <div>
-        <label class="lbl">固定資産税率（%）</label>
-        <input type="number" id="fixedRate" value="1.4" min="0" step="0.01">
-        <div class="hint">標準：1.4%</div>
+        <label class="lbl">元号年度<span class="optional">任意</span></label>
+        <input type="text" id="nendoLabel" placeholder="例：令和8年度（空欄で自動計算）">
+        <div class="hint">評価証明書に記載の年度（空欄の場合は引渡日の年を使用）</div>
       </div>
     </div>
-    <div class="form-grid" style="margin-top:14px;">
-      <div>
-        <label class="lbl">都市計画税率（%）</label>
-        <input type="number" id="cityRate" value="0.3" min="0" step="0.01">
-        <div class="hint">標準：0.3%（都市計画区域外は0%）</div>
+
+    <!-- 消費税設定（通達10-1-6） -->
+    <div class="sec-box tax" style="margin-top:16px;margin-bottom:0;">
+      <div class="sec-head tax">&#128181; 消費税の取扱い（消費税法基本通達10-1-6）</div>
+      <p style="font-size:11px;color:#166534;margin-bottom:10px;line-height:1.7;">
+        売主が<strong>課税事業者（業者）</strong>の場合、固都税精算金のうち建物に相当する部分に消費税がかかります。土地は非課税です。
+      </p>
+      <div class="seller-type-row">
+        <label><input type="radio" name="sellerType" id="sellerTypePersonal" value="personal" checked onchange="toggleTaxRate()"> 売主は個人（消費税なし）</label>
+        <label><input type="radio" name="sellerType" id="sellerTypeVendor" value="vendor" onchange="toggleTaxRate()"> 売主は業者（消費税あり）</label>
+      </div>
+      <div id="taxRateField">
+        <label class="lbl">消費税率（%）</label>
+        <input type="number" id="consumptionTaxRate" value="10" min="0" max="100" step="0.1" style="max-width:120px;">
+        <div class="hint">現行：10%（軽減税率対象外）</div>
       </div>
     </div>
   </div>
 
-  <!-- 課税標準額入力 -->
+  <!-- 年税額入力 -->
   <div class="card">
-    <div class="card-title">&#128196; 固定資産評価証明書の入力</div>
+    <div class="card-title">&#128196; 固定資産評価証明書（その2）の入力</div>
 
-    <p style="font-size:12px;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:10px 14px;margin-bottom:16px;line-height:1.8;">
-      <strong>入力する値</strong>：固定資産評価証明書の <strong>「課税標準額」</strong> を入力してください。<br>
-      マンション等で土地が共有の場合は「土地全体の課税標準額」と「持分（分子/分母）」を入力してください。
+    <p style="font-size:12px;color:#1e40af;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:10px 14px;margin-bottom:16px;line-height:1.9;">
+      <strong>入力する値</strong>：評価証明書（その2）の右側の列<strong>「固定資産税相当額」「都市計画税相当額」</strong>を入力してください。<br>
+      ・ <strong>建物</strong>は複数行ある場合は合計して入力してください（例：56,280＋592＝56,872）<br>
+      ・ <strong>土地（マンション）</strong>は敷地全体の値と持分を入力すると自動按分します
     </p>
 
     <!-- 土地 -->
@@ -158,87 +214,83 @@
       <div class="sec-head land">&#127968; 土地</div>
       <div class="form-grid">
         <div>
-          <label class="lbl">固定資産税 課税標準額（円）<span class="required">※</span></label>
-          <input type="number" id="land_fixed" placeholder="例：18,184,084" min="0" step="1">
-          <div class="hint">共有土地の場合は敷地全体の課税標準額</div>
+          <label class="lbl">固定資産税相当額（円）</label>
+          <input type="number" id="land_fixed" placeholder="例：503,101（敷地全体）" min="0" step="1">
         </div>
         <div>
-          <label class="lbl">都市計画税 課税標準額（円）<span class="required">※</span></label>
-          <input type="number" id="land_city" placeholder="例：36,368,169" min="0" step="1">
+          <label class="lbl">都市計画税相当額（円）</label>
+          <input type="number" id="land_city" placeholder="例：215,614（敷地全体）" min="0" step="1">
+          <div class="hint">都市計画区域外は0円</div>
         </div>
       </div>
       <div style="margin-top:12px;">
-        <label class="lbl">持分<span class="optional">マンション共有土地の場合</span></label>
-        <div class="frac-row" style="max-width:300px;">
-          <input type="number" id="land_fn" placeholder="分子（例：6879）" min="1" step="1">
+        <label class="lbl">持分<span class="optional">マンション（共有土地）の場合</span></label>
+        <div class="frac-row" style="max-width:320px;">
+          <input type="number" id="land_fn" placeholder="分子" min="1" step="1">
           <span class="frac-div">÷</span>
-          <input type="number" id="land_fd" placeholder="分母（例：323827）" min="1" step="1">
+          <input type="number" id="land_fd" placeholder="分母" min="1" step="1">
         </div>
-        <div class="hint">入力しない場合は持分100%（一戸建て等）として計算します。</div>
+        <div class="hint">一戸建ての場合は入力不要（持分100%で計算）</div>
       </div>
     </div>
 
     <!-- 建物 -->
     <div class="sec-box bldg">
       <div class="sec-head bldg">&#127970; 建物</div>
+      <p style="font-size:11px;color:#5b21b6;margin-bottom:10px;line-height:1.7;">
+        評価証明書に複数行ある場合は<strong>合計額</strong>を入力してください（例：専有部分＋規約共用部分の合計）
+      </p>
       <div class="form-grid">
         <div>
-          <label class="lbl">固定資産税 課税標準額（円）<span class="required">※</span></label>
-          <input type="number" id="bldg_fixed" placeholder="例：5,939,000" min="0" step="1">
+          <label class="lbl">固定資産税相当額 合計（円）</label>
+          <input type="number" id="bldg_fixed" placeholder="例：56,872" min="0" step="1">
         </div>
         <div>
-          <label class="lbl">都市計画税 課税標準額（円）<span class="required">※</span></label>
-          <input type="number" id="bldg_city" placeholder="例：5,939,000" min="0" step="1">
-          <div class="hint">課税なし（都市計画区域外等）は0を入力</div>
+          <label class="lbl">都市計画税相当額 合計（円）</label>
+          <input type="number" id="bldg_city" placeholder="例：12,186" min="0" step="1">
+          <div class="hint">都市計画区域外は0円</div>
         </div>
       </div>
     </div>
 
-    <!-- 納付書上書き -->
-    <div class="sec-box override">
-      <div class="sec-head override">&#128200; 年間合計税額の上書き（任意）</div>
-      <p style="font-size:11px;color:#9a3412;margin-bottom:10px;line-height:1.7;">
-        納付書（課税通知書）が手元にある場合は、<strong>固定資産税＋都市計画税の合計額</strong>を入力してください。評価証明書からの計算値より優先されます。
-      </p>
-      <div style="max-width:320px;">
-        <label class="lbl">年間 固定資産税＋都市計画税 合計額（円）</label>
-        <input type="number" id="taxOverride" placeholder="例：108,600（空欄＝自動計算）" min="0" step="1">
-      </div>
-    </div>
-
-    <span class="error-msg" id="err-input" style="display:none;font-size:12px;">土地または建物の課税標準額を入力してください。</span>
+    <span class="error-msg" id="err-input" style="font-size:12px;">土地または建物の税額を入力してください。</span>
     <button class="btn btn-calc" onclick="calculate()">&#9654; 精算書を作成する</button>
   </div>
 
   <!-- 結果：精算書 -->
   <div class="card" id="resultArea">
     <div class="result-header">
-      <div class="card-title" style="margin-bottom:0;padding-bottom:0;border-bottom:none;">精算書</div>
+      <div class="card-title" style="margin-bottom:0;padding-bottom:0;border-bottom:none;">精算書プレビュー</div>
       <div style="display:flex;gap:10px;align-items:center;">
         <button class="btn btn-reset" onclick="resetForm()">&#8635; リセット</button>
         <button class="btn btn-excel" onclick="downloadExcel()">&#8595; Excel出力</button>
       </div>
     </div>
-
     <div style="margin-top:14px;" id="seisanBody"></div>
   </div>
 </div>
 
 <script>
-/* ===== ユーティリティ ===== */
 let calcResult = null;
+
 function v(id){return document.getElementById(id).value;}
 function num(id){const n=parseFloat(v(id));return isNaN(n)?0:n;}
 function isLeapYear(y){return(y%4===0&&y%100!==0)||y%400===0;}
 function fmt(n){return Math.round(n).toLocaleString('ja-JP')+'円';}
 function fmtN(n){return Math.round(n).toLocaleString('ja-JP');}
+function fmtY(n){return '¥'+Math.round(n).toLocaleString('ja-JP');}
+
 function toWareki(y){
-  // 平成・令和変換（簡易）
   if(y>=2019) return `令和${y-2018}`;
   if(y>=1989) return `平成${y-1988}`;
   return `昭和${y-1925}`;
 }
 function fmtDate(y,m,d){return `${toWareki(y)}年${m}月${d}日`;}
+
+function toggleTaxRate(){
+  const isVendor = document.getElementById('sellerTypeVendor').checked;
+  document.getElementById('taxRateField').style.display = isVendor ? 'block' : 'none';
+}
 
 /* ===== バリデーション ===== */
 function validate(){
@@ -247,7 +299,6 @@ function validate(){
   document.getElementById('settlementDate').classList.toggle('invalid',noDate);
   document.getElementById('err-date').style.display=noDate?'block':'none';
   if(noDate)ok=false;
-
   const hasLand=v('land_fixed')!==''||v('land_city')!=='';
   const hasBldg=v('bldg_fixed')!==''||v('bldg_city')!=='';
   const noInput=!hasLand&&!hasBldg;
@@ -266,173 +317,257 @@ function calculate(){
   const day = sd.getDate();
   const totalDays = isLeapYear(year)?366:365;
 
-  // 売主日数 = 引渡日 - 1月1日（引渡日前日まで）
+  // 売主日数・買主日数
   const jan1 = new Date(year,0,1);
-  const sDays = Math.round((sd - jan1)/86400000); // DATE(y,m,d)-DATE(y,1,1)
-  const bDays = totalDays - sDays;                // 12/31 - 引渡日 + 1
+  const sDays = Math.round((sd - jan1)/86400000); // 1/1〜引渡前日
+  const bDays = totalDays - sDays;                // 引渡日〜12/31
 
-  const fixedRate = parseFloat(v('fixedRate'))||1.4;
-  const cityRate  = parseFloat(v('cityRate'))||0.3;
+  // 評価証明書（その2）から入力した相当額
+  const landFixed0 = num('land_fixed'); // 土地 固定資産税相当額（全体）
+  const landCity0  = num('land_city');  // 土地 都市計画税相当額（全体）
+  const bldgFixed  = num('bldg_fixed'); // 建物 固定資産税相当額（合計）
+  const bldgCity   = num('bldg_city');  // 建物 都市計画税相当額（合計）
 
-  // 課税標準額（按分前）
-  const landFixed0 = num('land_fixed');
-  const landCity0  = num('land_city');
-  const bldgFixed  = num('bldg_fixed');
-  const bldgCity   = num('bldg_city');
-
-  // 土地持分按分
+  // 持分按分（土地 マンション対応）
   const fn = parseFloat(v('land_fn'));
   const fd = parseFloat(v('land_fd'));
   const hasFrac = fn>0 && fd>0;
-  const landFixed = hasFrac ? landFixed0*fn/fd : landFixed0;
-  const landCity  = hasFrac ? landCity0*fn/fd  : landCity0;
+  // 土地の持分按分（四捨五入）
+  const landFixed = hasFrac ? Math.round(landFixed0 * fn/fd) : landFixed0;
+  const landCity  = hasFrac ? Math.round(landCity0  * fn/fd) : landCity0;
 
-  // 課税標準額合計（千円未満切捨）
-  const totalFixed = Math.floor((landFixed+bldgFixed)/1000)*1000;
-  const totalCity  = Math.floor((landCity+bldgCity)/1000)*1000;
+  // 年税額
+  const landAnnualTax = landFixed + landCity;
+  const bldgAnnualTax = bldgFixed + bldgCity;
+  const totalAnnualTax = landAnnualTax + bldgAnnualTax;
 
-  // 年税額（百円未満切捨）
-  const calcFixed = Math.floor(totalFixed*(fixedRate/100)/100)*100;
-  const calcCity  = Math.floor(totalCity*(cityRate/100)/100)*100;
-  const calcTotal = calcFixed + calcCity; // すでに100円単位のため合算も100円単位
+  // 日割り（買主負担を四捨五入、売主は残り）
+  const buyerLandAmt  = Math.round(landAnnualTax * bDays / totalDays);
+  const sellerLandAmt = landAnnualTax - buyerLandAmt;
+  const buyerBldgAmt  = Math.round(bldgAnnualTax * bDays / totalDays);
+  const sellerBldgAmt = bldgAnnualTax - buyerBldgAmt;
 
-  // 納付書上書き
-  const overrideStr = v('taxOverride');
-  const annualTotal = overrideStr!=='' ? (parseFloat(overrideStr)||0) : calcTotal;
+  const buyerSubTotal  = buyerLandAmt + buyerBldgAmt;
+  const sellerSubTotal = sellerLandAmt + sellerBldgAmt;
 
-  // 日割計算（切捨）
-  const sellerAmt = Math.floor(annualTotal * sDays / totalDays);
-  const buyerAmt  = annualTotal - sellerAmt;
+  // 消費税（通達10-1-6 売主が業者の場合のみ、小数点以下切捨）
+  const isVendor = document.getElementById('sellerTypeVendor').checked;
+  const consumptionTaxRate = parseFloat(v('consumptionTaxRate'))||10;
+  const ctaxAmt = isVendor ? Math.floor(buyerBldgAmt * consumptionTaxRate/100) : 0;
+
+  // 買主最終支払額
+  const buyerFinalAmt = buyerSubTotal + ctaxAmt;
+
+  // 年度ラベル
+  const nendoInput = v('nendoLabel').trim();
+  const nendoLabel = nendoInput || `${toWareki(year)}年度`;
 
   // 日付文字列
-  const sellerFromStr = fmtDate(year,1,1);
   const dayBefore = new Date(sd); dayBefore.setDate(dayBefore.getDate()-1);
   const sellerToStr = sDays>0 ? fmtDate(year, dayBefore.getMonth()+1, dayBefore.getDate()) : '—';
-  const buyerFromStr = fmtDate(year,month,day);
-  const buyerToStr   = fmtDate(year,12,31);
 
   calcResult = {
-    address:v('address').trim(), sellerName:v('sellerName').trim(), buyerName:v('buyerName').trim(),
+    propertyName:v('propertyName').trim(),
+    address:v('address').trim(),
+    sellerName:v('sellerName').trim(),
+    buyerName:v('buyerName').trim(),
     year, month, day, totalDays, sDays, bDays,
-    fixedRate, cityRate,
-    landFixed0, landCity0, landFixed, landCity, hasFrac, fn, fd,
+    nendoLabel,
+    landFixed0, landCity0, hasFrac, fn, fd,
+    landFixed, landCity,
     bldgFixed, bldgCity,
-    totalFixed, totalCity,
-    calcFixed, calcCity, calcTotal,
-    overrideStr, annualTotal,
-    sellerAmt, buyerAmt,
-    sellerFromStr, sellerToStr, buyerFromStr, buyerToStr,
+    landAnnualTax, bldgAnnualTax, totalAnnualTax,
+    buyerLandAmt, sellerLandAmt,
+    buyerBldgAmt, sellerBldgAmt,
+    buyerSubTotal, sellerSubTotal,
+    isVendor, consumptionTaxRate, ctaxAmt,
+    buyerFinalAmt,
+    sellerFromStr: fmtDate(year,1,1),
+    sellerToStr,
+    buyerFromStr: fmtDate(year,month,day),
+    buyerToStr: fmtDate(year,12,31),
   };
   renderResult(calcResult);
 }
 
-/* ===== 表示 ===== */
+/* ===== 表示（PDF形式） ===== */
 function renderResult(r){
-  const warekiYear = toWareki(r.year);
-  const titleYear  = `${warekiYear}年度`;
   const fracStr = r.hasFrac ? `（持分：${fmtN(r.fn)}／${fmtN(r.fd)}）` : '';
-  const overrideNote = r.overrideStr!=='' ? '<span style="color:#ea580c;font-size:11px;">★ 納付書入力値を使用</span>' : '';
+  const idxLabel = r.isVendor ? '…①＋②＋③' : '…①＋②';
 
   let html = `<div class="seisan-wrap">`;
 
   // タイトル
-  html += `<div class="seisan-title">${titleYear} 固定資産税・都市計画税精算書</div>`;
+  html += `<div class="seisan-doc-title">固定資産税・都市計画税清算書</div>`;
+
+  // 物件名
+  if(r.propertyName){
+    html += `<div class="seisan-property">${r.propertyName}</div>`;
+  }
 
   // 基本情報
   html += `<div class="seisan-info">`;
-  html += `<strong>物件所在地：</strong>${r.address||'（未入力）'}<br>`;
-  if(r.sellerName||r.buyerName){
-    if(r.sellerName) html+=`<strong>売主：</strong>${r.sellerName}　`;
-    if(r.buyerName)  html+=`<strong>買主：</strong>${r.buyerName}`;
-    html+='<br>';
-  }
-  html += `<strong>引渡日：</strong>${fmtDate(r.year,r.month,r.day)}　<strong>計算日数：</strong>${r.totalDays}日`;
+  if(r.address) html += `<strong>物件所在地：</strong>${r.address}　`;
+  if(r.sellerName) html += `<strong>売主：</strong>${r.sellerName}　`;
+  if(r.buyerName)  html += `<strong>買主：</strong>${r.buyerName}　`;
+  html += `<strong>引渡日：</strong>${fmtDate(r.year,r.month,r.day)}`;
   html += `</div>`;
 
-  // 課税標準テーブル
-  html += `<table class="seisan-table">
-    <thead>
-      <tr>
-        <th class="left" style="width:26%">課税標準</th>
-        <th style="width:37%">固定資産税</th>
-        <th style="width:37%">都市計画税</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td class="row-label">土地${fracStr}</td>
-        <td>${fmtN(r.landFixed)}円</td>
-        <td>${fmtN(r.landCity)}円</td>
-      </tr>
-      <tr>
-        <td class="row-label">建物</td>
-        <td>${fmtN(r.bldgFixed)}円</td>
-        <td>${fmtN(r.bldgCity)}円</td>
-      </tr>
-      <tr class="row-total">
-        <td class="row-label">合計（千円未満切捨）</td>
-        <td>${fmtN(r.totalFixed)}円</td>
-        <td>${fmtN(r.totalCity)}円</td>
-      </tr>
-      <tr class="row-rate">
-        <td class="row-label">税率</td>
-        <td>${r.fixedRate} ／ 100</td>
-        <td>${r.cityRate} ／ 100</td>
-      </tr>
-      <tr class="row-nengaku">
-        <td class="row-label">年額（小計・百円未満切捨）</td>
-        <td>${fmtN(r.calcFixed)}円</td>
-        <td>${fmtN(r.calcCity)}円</td>
-      </tr>
-      <tr class="row-gokei">
-        <td class="row-label">年額 合計 ${overrideNote}</td>
-        <td colspan="2" style="text-align:center;font-size:18px;">${fmtN(r.annualTotal)}円</td>
-      </tr>
-    </tbody>
-  </table>`;
-
-  // 負担計算
-  html += `<div class="futan-box">`;
-  html += `<div class="futan-title">&#9658; 負担期間・負担金額</div>`;
-
-  // 売主
-  const sDaysStr = r.sDays>0 ? `${r.sellerFromStr} ～ ${r.sellerToStr}（${r.sDays}日間）` : '負担なし（引渡日が1月1日）';
-  html += `<div class="futan-row seller">
-    <div class="futan-party">売主</div>
-    <div>
-      <div class="futan-period">&#128197; ${sDaysStr}</div>
-      <div class="futan-calc">${fmtN(r.annualTotal)}円 × ${r.sDays}日 ÷ ${r.totalDays}日</div>
-    </div>
-    <div class="futan-amount">${fmt(r.sellerAmt)}</div>
+  // セクションヘッダ
+  html += `<div class="section-header">
+    <span class="section-num">1.</span>
+    <span class="section-title">${r.nendoLabel}固定資産税／都市計画税</span>
+    <span class="section-eq">＝</span>
+    <span class="section-total">金 ${fmtN(r.totalAnnualTax)}円</span>
   </div>`;
 
-  // 買主
-  const bDaysStr = `${r.buyerFromStr} ～ ${r.buyerToStr}（${r.bDays}日間）`;
-  html += `<div class="futan-row buyer">
-    <div class="futan-party">買主</div>
-    <div>
-      <div class="futan-period">&#128197; ${bDaysStr}</div>
-      <div class="futan-calc">${fmtN(r.annualTotal)}円 − ${fmtN(r.sellerAmt)}円</div>
-    </div>
-    <div class="futan-amount">${fmt(r.buyerAmt)}</div>
+  // 4列年税額テーブル
+  html += `<div class="tax4-wrap">
+    <table class="tax4-table">
+      <thead>
+        <tr>
+          <th style="width:10%;">内訳<br>金額</th>
+          <th class="land-col" style="width:22.5%;">固定資産税<br>（土地${fracStr}）</th>
+          <th class="land-col" style="width:22.5%;">都市計画税<br>（土地${fracStr}）</th>
+          <th class="bldg-col" style="width:22.5%;">固定資産税<br>（建物）</th>
+          <th class="bldg-col" style="width:22.5%;">都市計画税<br>（建物）</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="lbl-cell">年税額</td>
+          <td class="land-col">${fmtY(r.landFixed)}</td>
+          <td class="land-col">${fmtY(r.landCity)}</td>
+          <td class="bldg-col">${fmtY(r.bldgFixed)}</td>
+          <td class="bldg-col">${fmtY(r.bldgCity)}</td>
+        </tr>
+      </tbody>
+    </table>
   </div>`;
 
-  html += `</div>`; // futan-box
+  // ①負担日数区分
+  html += `<div class="subsec-wrap">
+    <div class="subsec-title">①負担日数区分</div>
+    <div class="days-table">
+      <div class="days-row" style="margin-bottom:4px;">
+        <span class="dl">引　渡　日：</span>
+        <span class="dd"><strong style="font-size:14px;">${fmtDate(r.year,r.month,r.day)}</strong></span>
+      </div>
+      <div class="days-row" style="margin-bottom:4px;">
+        <span class="dl">売主様負担分：</span>
+        <span class="dd"><strong>${r.sDays}</strong> 日分</span>
+        <span class="dp">${r.sellerFromStr} ～ ${r.sellerToStr}</span>
+      </div>
+      <div class="days-row">
+        <span class="dl">買主様負担分：</span>
+        <span class="dd"><strong>${r.bDays}</strong> 日分</span>
+        <span class="dp">${r.buyerFromStr} ～ ${r.buyerToStr}</span>
+      </div>
+    </div>
+  </div>`;
+
+  // ②日割り清算式
+  html += `<div class="subsec-wrap">
+    <div class="subsec-title">②日割り清算式</div>
+    <table class="formula-table">
+      <tr>
+        <td class="fm-item">土地負担額</td>
+        <td class="fm-label">年税額</td>
+        <td class="fm-amt">金${fmtN(r.landAnnualTax)}円</td>
+        <td class="fm-op">×</td>
+        <td class="fm-days">${r.bDays}</td>
+        <td class="fm-op">÷</td>
+        <td class="fm-yr">${r.totalDays}</td>
+        <td class="fm-eq">=</td>
+        <td class="fm-result">金${fmtN(r.buyerLandAmt)}円</td>
+        <td class="fm-idx">…①</td>
+      </tr>
+      <tr>
+        <td class="fm-item">建物負担額</td>
+        <td class="fm-label">年税額</td>
+        <td class="fm-amt">金${fmtN(r.bldgAnnualTax)}円</td>
+        <td class="fm-op">×</td>
+        <td class="fm-days">${r.bDays}</td>
+        <td class="fm-op">÷</td>
+        <td class="fm-yr">${r.totalDays}</td>
+        <td class="fm-eq">=</td>
+        <td class="fm-result">金${fmtN(r.buyerBldgAmt)}円</td>
+        <td class="fm-idx">…②</td>
+      </tr>
+      ${r.isVendor ? `
+      <tr>
+        <td class="fm-item" style="color:#166534;">建物負担消費税額</td>
+        <td class="fm-label" style="color:#166534;">建物負担額</td>
+        <td class="fm-amt" style="color:#166534;">金${fmtN(r.buyerBldgAmt)}円</td>
+        <td class="fm-op">×</td>
+        <td class="fm-days" style="color:#166534;">${r.consumptionTaxRate}%</td>
+        <td class="fm-op"></td>
+        <td class="fm-yr"></td>
+        <td class="fm-eq">=</td>
+        <td class="fm-result" style="color:#166534;">金${fmtN(r.ctaxAmt)}円</td>
+        <td class="fm-idx" style="color:#166534;">…③</td>
+      </tr>` : ''}
+    </table>
+    <div class="formula-note">
+      ※小数点以下切り捨て
+      ${r.isVendor ? '<br>※売主が課税業者のため、建物精算金については消費税がかかります。（消費税関連法令通達10-1-6）' : ''}
+    </div>
+  </div>`;
+
+  // 売主・買主 負担額内訳
+  html += `<div class="subsec-wrap" style="border-top:2px solid #e2eaf5;">
+    <div class="subsec-title">売主様・買主様　負担額内訳</div>
+    <table class="burden-table">
+      <thead>
+        <tr>
+          <th class="bt-item">項　目</th>
+          <th class="bt-seller">売主様 負担額</th>
+          <th class="bt-buyer">買主様 負担額</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="bt-label">土地（固定＋都市）　…①</td>
+          <td class="bt-seller-val">金 ${fmtN(r.sellerLandAmt)}円</td>
+          <td class="bt-buyer-val">金 ${fmtN(r.buyerLandAmt)}円</td>
+        </tr>
+        <tr>
+          <td class="bt-label">建物（固定＋都市）　…②</td>
+          <td class="bt-seller-val">金 ${fmtN(r.sellerBldgAmt)}円</td>
+          <td class="bt-buyer-val">金 ${fmtN(r.buyerBldgAmt)}円</td>
+        </tr>
+        ${r.isVendor ? `
+        <tr>
+          <td class="bt-label" style="color:#166534;">建物消費税（${r.consumptionTaxRate}%）　…③</td>
+          <td class="bt-seller-val" style="color:#aaa;font-weight:normal;">—</td>
+          <td class="bt-buyer-val" style="color:#166534;">金 ${fmtN(r.ctaxAmt)}円</td>
+        </tr>` : ''}
+        <tr class="bt-total-row">
+          <td class="bt-label">合　計</td>
+          <td class="bt-seller-total">金 ${fmtN(r.sellerSubTotal)}円</td>
+          <td class="bt-buyer-total">金 ${fmtN(r.buyerFinalAmt)}円</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>`;
+
+  // 精算金バー
+  html += `<div class="settle-bar">
+    <span class="settle-bar-label">買主様より売主様への清算金</span>
+    <span>
+      <span class="settle-bar-amount">金 ${fmtN(r.buyerFinalAmt)}円</span>
+      <span class="settle-bar-idx">${idxLabel}</span>
+    </span>
+  </div>`;
 
   html += `</div>`; // seisan-wrap
 
-  // 精算金ボックス
-  html += `<div class="settle-box">
-    <div class="settle-label">精算金（買主 → 売主）</div>
-    <div class="settle-amount">&#65509;${fmtN(r.buyerAmt)}</div>
-  </div>`;
-
   // 注記
   html += `<p class="note">
-    ※ 起算日：1月1日　引渡日の負担：買主負担<br>
-    ※ 課税標準額は千円未満切捨後に税率を乗じ、百円未満切捨で年税額を計算<br>
-    ※ 日割は「売主負担額 = 合計年税額 × 売主日数 ÷ 年間日数（円未満切捨）、買主負担額 = 合計年税額 − 売主負担額」
-    ${r.overrideStr!==''?'<br>★ 年間合計税額は入力された納付書金額を使用しています':''}
+    ※ 起算日：1月1日　引渡日：買主負担<br>
+    ※ 入力値は固定資産評価証明書（その2）の「固定資産税相当額/都市計画税相当額」を使用<br>
+    ※ 日割：買主負担額 ＝ 年税額 × 買主日数 ÷ 年間日数（四捨五入）、売主負担額 ＝ 年税額 − 買主負担額
+    ${r.isVendor ? '<br>※ 建物消費税：建物負担額 × 消費税率（小数点以下切捨）' : ''}
   </p>`;
 
   document.getElementById('seisanBody').innerHTML = html;
@@ -442,9 +577,13 @@ function renderResult(r){
 
 /* ===== リセット ===== */
 function resetForm(){
-  ['address','sellerName','buyerName','settlementDate','land_fixed','land_city','land_fn','land_fd','bldg_fixed','bldg_city','taxOverride'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('fixedRate').value='1.4';
-  document.getElementById('cityRate').value='0.3';
+  ['propertyName','address','sellerName','buyerName','settlementDate','nendoLabel',
+   'land_fixed','land_city','land_fn','land_fd','bldg_fixed','bldg_city'].forEach(id=>{
+    document.getElementById(id).value='';
+  });
+  document.getElementById('sellerTypePersonal').checked=true;
+  document.getElementById('consumptionTaxRate').value='10';
+  document.getElementById('taxRateField').style.display='none';
   ['err-date','err-input'].forEach(id=>document.getElementById(id).style.display='none');
   document.getElementById('settlementDate').classList.remove('invalid');
   document.getElementById('resultArea').style.display='none';
@@ -459,7 +598,8 @@ function downloadExcel(){
   try{
     const wb = XLSX.utils.book_new();
     buildSeisanSheet(wb, calcResult);
-    XLSX.writeFile(wb,`固都税精算書_${calcResult.year}年_${calcResult.address||'物件'}.xlsx`);
+    const fname = `固都税精算書_${calcResult.nendoLabel}_${calcResult.propertyName||calcResult.address||'物件'}.xlsx`;
+    XLSX.writeFile(wb, fname);
   }catch(e){alert('Excel出力エラー: '+e.message);console.error(e);}
 }
 
@@ -471,107 +611,197 @@ function buildSeisanSheet(wb, r){
   const BDm=c=>({top:{style:'medium',color:{rgb:c}},bottom:{style:'medium',color:{rgb:c}},left:{style:'medium',color:{rgb:c}},right:{style:'medium',color:{rgb:c}}});
   function cs(v,s){return{v,t:'s',s:s||{}};}
   function cn(v,s){return{v,t:'n',s:s||{}};}
+  function cf(f,v,s){return{f,v,t:'n',s:s||{}};}
+  function R(row){return row+1;}
   function fnt(bold,sz,clr){return{name:'メイリオ',bold:!!bold,sz:sz||10,color:{rgb:clr||'333333'}};}
   function fill(c){return{patternType:'solid',fgColor:{rgb:c}};}
-  function aln(h){return{horizontal:h||'left',vertical:'center'};}
+  function aln(h,v2){return{horizontal:h||'left',vertical:v2||'center'};}
 
-  const warekiYear = toWareki(r.year);
   const fracStr = r.hasFrac ? `（持分：${fmtN(r.fn)}／${fmtN(r.fd)}）` : '';
 
-  // ── タイトル ──
-  let rr = nr([cs(`${warekiYear}年度　固定資産税・都市計画税精算書`,
-    {font:fnt(true,16,'FFFFFF'),fill:fill('1E3A6E'),alignment:aln('center')})],36);
-  M(rr,0,rr,2);
+  // ── ドキュメントタイトル ──
+  let rr = nr([cs('固定資産税・都市計画税清算書',
+    {font:fnt(true,16,'FFFFFF'),fill:fill('1E3A6E'),alignment:aln('center')})],34);
+  M(rr,0,rr,5);
 
+  // ── 物件名 ──
+  if(r.propertyName){
+    rr=nr([cs(r.propertyName,{font:fnt(true,14,'1E3A6E'),fill:fill('DBEAFE'),alignment:aln('center')})],30);
+    M(rr,0,rr,5);
+  }
   nr([],6);
 
   // ── 基本情報 ──
-  const sLbl={font:fnt(true,10,'1E3A6E'),fill:fill('EFF6FF'),alignment:aln('center'),border:BD};
+  const sLbl={font:fnt(true,9,'1E3A6E'),fill:fill('EFF6FF'),alignment:aln('center'),border:BD};
   const sVal={font:fnt(false,10),fill:fill('FFFFFF'),alignment:aln('left'),border:BD};
-
-  rr=nr([cs('物件所在地',sLbl), cs(r.address||'',{...sVal,font:fnt(false,11)}), null],22); M(rr,1,rr,2);
-
+  if(r.address){
+    rr=nr([cs('物件所在地',sLbl),cs(r.address,{...sVal,font:fnt(false,10)}),null,null,null,null],18); M(rr,1,rr,5);
+  }
   if(r.sellerName||r.buyerName){
-    rr=nr([cs('売主　/　買主',sLbl),
-      cs(`${r.sellerName||'（未入力）'}　／　${r.buyerName||'（未入力）'}`,sVal),null],18); M(rr,1,rr,2);
+    rr=nr([cs('売主 / 買主',sLbl),
+      cs(`${r.sellerName||'（未入力）'}　／　${r.buyerName||'（未入力）'}`,sVal),null,null,null,null],18);
+    M(rr,1,rr,5);
+  }
+  rr=nr([cs('引渡日',sLbl),cs(fmtDate(r.year,r.month,r.day),sVal),null,null,null,null],18); M(rr,1,rr,5);
+  nr([],8);
+
+  // ── 1. 年税額セクション ──
+  const sHdr1={font:fnt(true,11,'FFFFFF'),fill:fill('1E3A6E'),alignment:aln('left')};
+  rr=nr([cs(`1.　${r.nendoLabel}固定資産税／都市計画税`,sHdr1),
+    null,null,null,
+    cs('＝',{font:fnt(true,11,'FFFFFF'),fill:fill('1E3A6E'),alignment:aln('center')}),
+    cn(r.totalAnnualTax,{font:fnt(true,13,'FFFFFF'),fill:fill('1E3A6E'),alignment:aln('right'),numFmt:'"金 "#,##0"円"'})
+  ],26);
+  M(rr,0,rr,3);
+
+  // 4列年税額ヘッダ
+  const sHdr4={font:fnt(true,9,'FFFFFF'),fill:fill('334E6E'),alignment:aln('center'),border:BD};
+  const sLndH={font:fnt(true,9,'FFFFFF'),fill:fill('1D4ED8'),alignment:aln('center'),border:BD};
+  const sBldH={font:fnt(true,9,'FFFFFF'),fill:fill('6D28D9'),alignment:aln('center'),border:BD};
+  rr=nr([
+    cs('内訳 / 金額',sHdr4),
+    cs(`固定資産税\n（土地${fracStr}）`,sLndH),
+    cs(`都市計画税\n（土地${fracStr}）`,sLndH),
+    cs('固定資産税\n（建物）',sBldH),
+    cs('都市計画税\n（建物）',sBldH),
+    null
+  ],30);
+
+  const sLndV={font:fnt(false,11,'1E40AF'),fill:fill('EFF6FF'),alignment:aln('right'),border:BD,numFmt:'"¥"#,##0'};
+  const sBldV={font:fnt(false,11,'5B21B6'),fill:fill('F5F3FF'),alignment:aln('right'),border:BD,numFmt:'"¥"#,##0'};
+  const sLbl2={font:fnt(true,9,'334E6E'),fill:fill('F0F4F8'),alignment:aln('center'),border:BD};
+  rr=nr([cs('年税額',sLbl2), cn(r.landFixed,sLndV), cn(r.landCity,sLndV), cn(r.bldgFixed,sBldV), cn(r.bldgCityInput||r.bldgCity,sBldV), null],24);
+
+  nr([],8);
+
+  // ── ①負担日数区分 ──
+  const sSub={font:fnt(true,11,'FFFFFF'),fill:fill('334E6E'),alignment:aln('left')};
+  rr=nr([cs('　①負担日数区分',sSub),null,null,null,null,null],22); M(rr,0,rr,5);
+
+  const sDL={font:fnt(true,9,'334E6E'),fill:fill('F8FAFC'),alignment:aln('right'),border:BD};
+  const sDD={font:fnt(false,10),fill:fill('FFFFFF'),alignment:aln('left'),border:BD};
+  const sDB={font:fnt(true,12,'1E3A6E'),fill:fill('FEFCE8'),alignment:aln('center'),border:BD};
+
+  rr=nr([cs('引　渡　日：',sDL), cs(fmtDate(r.year,r.month,r.day),{...sDD,font:fnt(true,11,'1E3A6E')}), null,null,null,null],22); M(rr,1,rr,5);
+
+  rr=nr([cs('売主様負担分：',sDL), cn(r.sDays,{...sDB}),
+    cs('日分',{...sDD}),
+    cs(r.sellerFromStr,sDD), cs('～',{...sDD,alignment:aln('center')}), cs(r.sellerToStr,sDD)],20);
+
+  rr=nr([cs('買主様負担分：',sDL), cn(r.bDays,{...sDB}),
+    cs('日分',{...sDD}),
+    cs(r.buyerFromStr,sDD), cs('～',{...sDD,alignment:aln('center')}), cs(r.buyerToStr,sDD)],20);
+
+  nr([],8);
+
+  // ── ②日割り清算式 ──
+  rr=nr([cs('　②日割り清算式',sSub),null,null,null,null,null],22); M(rr,0,rr,5);
+
+  // 土地負担額（数式）
+  // セルアドレス追跡
+  // 土地年税額: col B(1) of 年税額行
+  // 建物年税額: col D(3)+E(4) ... 実際には独自に計算
+  const sFL={font:fnt(true,10,'1E3A6E'),fill:fill('FEFCE8'),alignment:aln('center'),border:BD};
+  const sFV={font:fnt(false,10),fill:fill('FEFCE8'),alignment:aln('center'),border:BD};
+  const sFR={font:fnt(true,12,'1E3A6E'),fill:fill('FEFCE8'),alignment:aln('right'),border:BD,numFmt:'"金"#,##0"円"'};
+  const sFI={font:fnt(true,10,'1D4ED8'),fill:fill('FEFCE8'),alignment:aln('center'),border:BD};
+
+  // 土地年税額セル参照のため行を保存
+  const rowTax4 = rn - 4; // 年税額行（nr後なので-1で取得できる）
+  // 実際には数式でなくr.bDaysとr.totalDaysを直接埋め込む
+
+  const rowLandFormula = nr([
+    cs('土地負担額',sFL),
+    cs('年税額',{...sFV,font:fnt(false,9,'666666')}),
+    cn(r.landAnnualTax,{...sFV,numFmt:'"金"#,##0"円"'}),
+    cs(`× ${r.bDays} ÷ ${r.totalDays}`,{...sFV,font:fnt(false,9,'666666')}),
+    cs('=',{...sFV,font:fnt(true,12,'94A3B8')}),
+    cf(`ROUND(C${R(rn)}*${r.bDays}/${r.totalDays},0)`, r.buyerLandAmt, {...sFR})
+  ],22);
+  // 修正: C{rowLandFormula+1} に landAnnualTax が入っているのでそこを参照
+  // ただし数式はすでに書いてしまったので、固定値として入力し数式は後で追記
+  // → cf を後から追加する方式は複雑なので、まず行を書いてから数式セルだけ上書き
+  ws[XLSX.utils.encode_cell({r:rowLandFormula,c:5})] = cf(
+    `ROUND(C${R(rowLandFormula)}*${r.bDays}/${r.totalDays},0)`,
+    r.buyerLandAmt,
+    {...sFR}
+  );
+  // idx
+  ws[XLSX.utils.encode_cell({r:rowLandFormula,c:5})] = {...ws[XLSX.utils.encode_cell({r:rowLandFormula,c:5})]};
+  nr([cs('',{fill:fill('FEFCE8'),border:BD}),null,null,null,cs('…①',sFI),null],12);
+
+  // 建物負担額
+  const rowBldgFormula = nr([
+    cs('建物負担額',sFL),
+    cs('年税額',{...sFV,font:fnt(false,9,'666666')}),
+    cn(r.bldgAnnualTax,{...sFV,numFmt:'"金"#,##0"円"'}),
+    cs(`× ${r.bDays} ÷ ${r.totalDays}`,{...sFV,font:fnt(false,9,'666666')}),
+    cs('=',{...sFV,font:fnt(true,12,'94A3B8')}),
+    cf(`ROUND(C${R(rn)}*${r.bDays}/${r.totalDays},0)`, r.buyerBldgAmt, {...sFR})
+  ],22);
+  ws[XLSX.utils.encode_cell({r:rowBldgFormula,c:5})] = cf(
+    `ROUND(C${R(rowBldgFormula)}*${r.bDays}/${r.totalDays},0)`,
+    r.buyerBldgAmt, {...sFR}
+  );
+  nr([cs('',{fill:fill('FEFCE8'),border:BD}),null,null,null,cs('…②',sFI),null],12);
+
+  // 消費税（業者の場合）
+  let rowCtaxFormula;
+  if(r.isVendor){
+    const sFCT={font:fnt(true,10,'166534'),fill:fill('F0FDF4'),alignment:aln('center'),border:BD};
+    const sFCTR={font:fnt(true,12,'166534'),fill:fill('F0FDF4'),alignment:aln('right'),border:BD,numFmt:'"金"#,##0"円"'};
+    rowCtaxFormula = nr([
+      cs('建物負担消費税額',sFCT),
+      cs('建物負担額',{...sFCT,font:fnt(false,9,'166534')}),
+      cf(`F${R(rowBldgFormula)}`, r.buyerBldgAmt, {...sFCT,numFmt:'"金"#,##0"円"'}),
+      cs(`× ${r.consumptionTaxRate}%`,{...sFCT,font:fnt(false,9,'166534')}),
+      cs('=',{...sFCT,font:fnt(true,12,'94A3B8')}),
+      cf(`FLOOR(F${R(rowBldgFormula)}*${r.consumptionTaxRate}/100,1)`, r.ctaxAmt, sFCTR)
+    ],22);
+    nr([cs('',{fill:fill('F0FDF4'),border:BD}),null,null,null,cs('…③',{...sFI,font:fnt(true,10,'166534'),fill:fill('F0FDF4')}),null],12);
   }
 
-  rr=nr([cs('引渡日',sLbl),
-    cs(`${fmtDate(r.year,r.month,r.day)}`,sVal),
-    cs(`${warekiYear}年度（${r.totalDays}日）`,sVal)],18);
-
-  nr([],8);
-
-  // ── 課税標準テーブル ──
-  const sHdr={font:fnt(true,9,'FFFFFF'),fill:fill('334E6E'),alignment:aln('center'),border:BD};
-  const sRowLbl={font:fnt(true,10,'1E3A6E'),fill:fill('F8FAFC'),alignment:aln('left'),border:BD};
-  const sNum={font:fnt(false,10),fill:fill('FFFFFF'),alignment:aln('right'),border:BD,numFmt:'#,##0"円"'};
-  const sNumBlue={font:fnt(true,10,'1E40AF'),fill:fill('DBEAFE'),alignment:aln('right'),border:BD,numFmt:'#,##0"円"'};
-  const sGray={font:fnt(false,9,'64748B'),fill:fill('F1F5F9'),alignment:aln('center'),border:BD};
-  const sGokei={font:fnt(true,13,'065F46'),fill:fill('D1FAE5'),alignment:aln('center'),border:BD,numFmt:'"¥"#,##0'};
-
-  rr=nr([cs('課税標準',sHdr), cs('固定資産税',sHdr), cs('都市計画税',sHdr)],22);
-  rr=nr([cs(`土地${fracStr}`,sRowLbl), cn(Math.round(r.landFixed),sNum), cn(Math.round(r.landCity),sNum)],20);
-  rr=nr([cs('建物',sRowLbl), cn(r.bldgFixed,sNum), cn(r.bldgCity,sNum)],20);
-  rr=nr([cs('合計（千円未満切捨）',{...sRowLbl,fill:fill('DBEAFE'),font:fnt(true,10,'1E40AF')}),
-    cn(r.totalFixed,sNumBlue), cn(r.totalCity,sNumBlue)],20);
-  rr=nr([cs('税率',sRowLbl), cs(`${r.fixedRate} ／ 100`,sGray), cs(`${r.cityRate} ／ 100`,sGray)],18);
-  rr=nr([cs('年額（小計・百円未満切捨）',sRowLbl),
-    cn(r.calcFixed,{...sNum,fill:fill('F8FAFC')}), cn(r.calcCity,{...sNum,fill:fill('F8FAFC')})],20);
-
-  const gokeiLabel = r.overrideStr!=='' ? '年額 合計（★納付書入力値）' : '年額 合計';
-  rr=nr([cs(gokeiLabel,{...sRowLbl,fill:fill('D1FAE5'),font:fnt(true,10,'065F46')}),
-    cn(r.annualTotal,sGokei), null],26); M(rr,1,rr,2);
-
-  nr([],8);
-
-  // ── 負担期間・金額 ──
-  rr=nr([cs('　負担期間・負担金額',{font:fnt(true,11,'FFFFFF'),fill:fill('1E3A6E'),alignment:aln('left')})],22); M(rr,0,rr,2);
-  const sTh={font:fnt(true,9,'FFFFFF'),fill:fill('334E6E'),alignment:aln('center'),border:BD};
-  rr=nr([cs('区分',sTh), cs('負担期間',sTh), cs('負担金額',sTh)],20);
-
-  // 売主
-  const sellerPeriod = r.sDays>0
-    ? `${r.sellerFromStr} ～ ${r.sellerToStr}（${r.sDays}日間）`
-    : '負担なし（引渡日が1月1日）';
-  const sellerCalc = `${fmtN(r.annualTotal)}円 × ${r.sDays}日 ÷ ${r.totalDays}日（円未満切捨）`;
-  const sSLbl={font:fnt(true,10,'78350F'),fill:fill('FEFCE8'),alignment:aln('center'),border:BD};
-  const sSVal={font:fnt(false,9,'78350F'),fill:fill('FEFCE8'),alignment:aln('left'),border:BD};
-  const sSAmt={font:fnt(true,13,'065F46'),fill:fill('FEFCE8'),alignment:aln('center'),border:BD,numFmt:'"¥"#,##0'};
-  rr=nr([cs('売主',sSLbl), cs(sellerPeriod,sSVal), cn(r.sellerAmt,sSAmt)],22);
-  rr=nr([cs('',{fill:fill('FEFCE8'),border:BD}), cs(sellerCalc,{...sSVal,font:fnt(false,8,'9A3412')}), cs('',{fill:fill('FEFCE8'),border:BD})],14);
-
-  // 買主
-  const buyerPeriod = `${r.buyerFromStr} ～ ${r.buyerToStr}（${r.bDays}日間）`;
-  const buyerCalc = `${fmtN(r.annualTotal)}円 − ${fmtN(r.sellerAmt)}円`;
-  const sBLbl={font:fnt(true,10,'5B21B6'),fill:fill('F5F3FF'),alignment:aln('center'),border:BD};
-  const sBVal={font:fnt(false,9,'5B21B6'),fill:fill('F5F3FF'),alignment:aln('left'),border:BD};
-  const sBAmt={font:fnt(true,13,'065F46'),fill:fill('F5F3FF'),alignment:aln('center'),border:BD,numFmt:'"¥"#,##0'};
-  rr=nr([cs('買主',sBLbl), cs(buyerPeriod,sBVal), cn(r.buyerAmt,sBAmt)],22);
-  rr=nr([cs('',{fill:fill('F5F3FF'),border:BD}), cs(buyerCalc,{...sBVal,font:fnt(false,8,'4C1D95')}), cs('',{fill:fill('F5F3FF'),border:BD})],14);
+  // 注記
+  const sNote={font:fnt(false,8,'9A3412'),fill:fill('FFF7ED'),alignment:aln('left')};
+  rr=nr([cs('※小数点以下切り捨て',sNote),null,null,null,null,null],12); M(rr,0,rr,5);
+  if(r.isVendor){
+    rr=nr([cs('※売主が課税業者のため、建物精算金については消費税がかかります。（消費税関連法令通達10-1-6）',sNote),null,null,null,null,null],12);
+    M(rr,0,rr,5);
+  }
 
   nr([],10);
 
   // ── 精算金ボックス ──
   const boxBg='FEFCE8'; const boxBdr='D97706'; const boxClr='78350F';
-  rr=nr([cs('精算金（買主 → 売主）',{font:fnt(true,12,boxClr),fill:fill(boxBg),alignment:aln('center'),border:BDm(boxBdr)}),
-    null, cn(r.buyerAmt,{font:fnt(true,18,boxClr),fill:fill(boxBg),alignment:aln('center'),border:BDm(boxBdr),numFmt:'"¥"#,##0'})],38);
-  M(rr,0,rr,1);
+  const idxLabel = r.isVendor ? '…①＋②＋③' : '…①＋②';
+
+  let buyerFinalFormula;
+  if(r.isVendor){
+    buyerFinalFormula = `F${R(rowLandFormula)}+F${R(rowBldgFormula)}+F${R(rowCtaxFormula)}`;
+  } else {
+    buyerFinalFormula = `F${R(rowLandFormula)}+F${R(rowBldgFormula)}`;
+  }
+
+  rr=nr([
+    cs('買主様より売主様への清算金',{font:fnt(true,12,boxClr),fill:fill(boxBg),alignment:aln('center'),border:BDm(boxBdr)}),
+    null,null,null,
+    cs(idxLabel,{font:fnt(false,9,boxClr),fill:fill(boxBg),alignment:aln('center'),border:BDm(boxBdr)}),
+    cf(buyerFinalFormula, r.buyerFinalAmt, {font:fnt(true,18,boxClr),fill:fill(boxBg),alignment:aln('right'),border:BDm(boxBdr),numFmt:'"金 "#,##0"円"'})
+  ],40);
+  M(rr,0,rr,3);
 
   nr([],10);
 
   // ── 計算条件 ──
-  const sNote={font:fnt(false,8,'AAAAAA'),fill:fill('F8FAFC'),alignment:aln('left')};
-  rr=nr([cs(`計算条件：起算日 1月1日　引渡日 買主負担　日割端数 円未満切捨　固定資産税率 ${r.fixedRate}%　都市計画税率 ${r.cityRate}%`,sNote)],14);
-  M(rr,0,rr,2);
-  if(r.overrideStr!==''){
-    rr=nr([cs(`★ 年額合計は納付書入力値（${fmtN(r.annualTotal)}円）を使用。評価証明書計算値：${fmtN(r.calcTotal)}円`,{...sNote,font:fnt(false,8,'EA580C')})],14);
-    M(rr,0,rr,2);
-  }
+  const sCond={font:fnt(false,8,'AAAAAA'),fill:fill('F8FAFC'),alignment:aln('left')};
+  rr=nr([cs(`計算条件：起算日 1月1日　引渡日 買主負担　日割 四捨五入　消費税（建物）切捨`,sCond),null,null,null,null,null],14);
+  M(rr,0,rr,5);
+  rr=nr([cs(`入力値：固定資産評価証明書（その2）の固定資産税相当額・都市計画税相当額`,sCond),null,null,null,null,null],14);
+  M(rr,0,rr,5);
 
-  ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rn,c:2}});
+  ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rn,c:5}});
   ws['!merges']=merges;
-  ws['!cols']=[{wch:30},{wch:20},{wch:20}];
+  ws['!cols']=[{wch:16},{wch:14},{wch:14},{wch:18},{wch:8},{wch:16}];
   ws['!rows']=rowH;
   ws['!pageSetup']={paperSize:9,orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:1};
   XLSX.utils.book_append_sheet(wb, ws, '固都税精算書');
