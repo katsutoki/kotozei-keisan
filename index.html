@@ -130,6 +130,21 @@
     .bt-seller-total{padding:10px;border:1.5px solid #dc2626;background:#fee2e2;text-align:right;color:#7f1d1d;font-weight:bold;font-size:14px;}
     .bt-buyer-total{padding:10px;border:1.5px solid #2563eb;background:#dbeafe;text-align:right;color:#1e3a6e;font-weight:bold;font-size:14px;}
 
+    /* 管理費精算書 */
+    .kanri-wrap{border:1.5px solid #fed7aa;border-radius:8px;overflow:hidden;margin-top:18px;}
+    .kanri-doc-title{background:#c2410c;color:#fff;text-align:center;padding:10px;font-size:15px;font-weight:bold;letter-spacing:.08em;}
+    .kanri-table{width:100%;border-collapse:collapse;font-size:12px;}
+    .kanri-table th{padding:7px 8px;background:#7c2d12;color:#fff;text-align:center;border:1px solid #9a3412;font-size:11px;line-height:1.4;}
+    .kanri-table td{padding:8px 8px;border:1px solid #fed7aa;text-align:right;}
+    .kanri-table td.kt-lbl{text-align:left;background:#fff7ed;font-weight:bold;font-size:11px;color:#7c2d12;}
+    .kanri-table tr.kt-total{background:#fff7ed;}
+    .kanri-table tr.kt-total td{font-weight:bold;border-top:2px solid #c2410c;}
+    .kanri-settle-bar{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:#fff7ed;border-top:2px solid #c2410c;flex-wrap:wrap;gap:8px;}
+    .kanri-settle-label{font-size:13px;font-weight:bold;color:#7c2d12;}
+    .kanri-settle-amount{font-size:20px;font-weight:bold;color:#7c2d12;}
+    .sec-box.kanri{border-color:#fed7aa;background:#fff7ed;}
+    .sec-head.kanri{background:#ea580c;}
+
     .note{font-size:11px;color:#999;margin-top:12px;line-height:1.8;padding:10px 12px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;}
 
     @media(max-width:600px){
@@ -257,6 +272,44 @@
     <button class="btn btn-calc" onclick="calculate()">&#9654; 精算書を作成する</button>
   </div>
 
+  <!-- 管理費等 -->
+  <div class="card">
+    <div class="card-title">&#127962; 管理費等の入力<span class="optional" style="font-weight:normal;font-size:12px;margin-left:8px;">任意</span></div>
+    <p style="font-size:12px;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:10px 14px;margin-bottom:16px;line-height:1.9;">
+      入力すると<strong>管理費等清算書</strong>も同時に作成されます。引渡月の日割りで自動計算します。<br>
+      ※ 入力不要の場合は空欄のままで構いません。
+    </p>
+    <div class="sec-box kanri">
+      <div class="sec-head kanri">&#128181; 管理費等（月額）</div>
+      <div class="form-grid">
+        <div>
+          <label class="lbl">管理費（円/月）</label>
+          <input type="number" id="kanri_fee" placeholder="例：12,000" min="0" step="1">
+        </div>
+        <div>
+          <label class="lbl">修繕積立金（円/月）</label>
+          <input type="number" id="shuzen_fee" placeholder="例：8,000" min="0" step="1">
+        </div>
+        <div>
+          <label class="lbl">その他① 名称<span class="optional">任意</span></label>
+          <input type="text" id="other1_name" placeholder="例：駐車場代">
+        </div>
+        <div>
+          <label class="lbl">その他① 金額（円/月）</label>
+          <input type="number" id="other1_fee" placeholder="例：10,000" min="0" step="1">
+        </div>
+        <div>
+          <label class="lbl">その他② 名称<span class="optional">任意</span></label>
+          <input type="text" id="other2_name" placeholder="例：専用庭使用料">
+        </div>
+        <div>
+          <label class="lbl">その他② 金額（円/月）</label>
+          <input type="number" id="other2_fee" placeholder="例：2,000" min="0" step="1">
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- 結果：精算書 -->
   <div class="card" id="resultArea">
     <div class="result-header">
@@ -366,6 +419,38 @@ function calculate(){
   const dayBefore = new Date(sd); dayBefore.setDate(dayBefore.getDate()-1);
   const sellerToStr = sDays>0 ? fmtDate(year, dayBefore.getMonth()+1, dayBefore.getDate()) : '—';
 
+  // ── 管理費等精算 ──
+  const daysInMonth = new Date(year, month, 0).getDate(); // 引渡月の日数
+  const bDaysMonth  = daysInMonth - day + 1;              // 買主負担（引渡日〜月末）
+  const sDaysMonth  = day - 1;                            // 売主負担（1日〜引渡前日）
+
+  function calcMonthly(fee){
+    const buyer  = Math.round(fee * bDaysMonth / daysInMonth);
+    const seller = fee - buyer;
+    return {monthly:fee, buyer, seller};
+  }
+
+  const kanriItems = [];
+  const kf = num('kanri_fee'), sf = num('shuzen_fee');
+  const o1f = num('other1_fee'), o2f = num('other2_fee');
+  if(kf  > 0) kanriItems.push({name:'管理費',    ...calcMonthly(kf)});
+  if(sf  > 0) kanriItems.push({name:'修繕積立金', ...calcMonthly(sf)});
+  if(o1f > 0) kanriItems.push({name:v('other1_name').trim()||'その他①', ...calcMonthly(o1f)});
+  if(o2f > 0) kanriItems.push({name:v('other2_name').trim()||'その他②', ...calcMonthly(o2f)});
+
+  const kanriTotal = {
+    monthly: kanriItems.reduce((s,x)=>s+x.monthly,0),
+    buyer:   kanriItems.reduce((s,x)=>s+x.buyer,  0),
+    seller:  kanriItems.reduce((s,x)=>s+x.seller, 0),
+  };
+
+  // 月の最終日の日付文字列
+  const lastDay = new Date(year, month, 0).getDate();
+  const kanriSellerFrom = fmtDate(year, month, 1);
+  const kanriSellerTo   = sDaysMonth > 0 ? fmtDate(year, month, sDaysMonth) : '—';
+  const kanriBuyerFrom  = fmtDate(year, month, day);
+  const kanriBuyerTo    = fmtDate(year, month, lastDay);
+
   calcResult = {
     propertyName:v('propertyName').trim(),
     address:v('address').trim(),
@@ -386,6 +471,10 @@ function calculate(){
     sellerToStr,
     buyerFromStr: fmtDate(year,month,day),
     buyerToStr: fmtDate(year,12,31),
+    // 管理費等
+    kanriItems, kanriTotal,
+    daysInMonth, bDaysMonth, sDaysMonth,
+    kanriSellerFrom, kanriSellerTo, kanriBuyerFrom, kanriBuyerTo,
   };
   renderResult(calcResult);
 }
@@ -570,15 +659,126 @@ function renderResult(r){
     ${r.isVendor ? '<br>※ 建物消費税：建物負担額 × 消費税率（小数点以下切捨）' : ''}
   </p>`;
 
+  // 管理費精算書（入力がある場合のみ）
+  if(r.kanriItems.length > 0){
+    html += renderKanriSection(r);
+  }
+
   document.getElementById('seisanBody').innerHTML = html;
   document.getElementById('resultArea').style.display = 'block';
   document.getElementById('resultArea').scrollIntoView({behavior:'smooth'});
 }
 
+/* ===== 管理費精算書 表示 ===== */
+function renderKanriSection(r){
+  const monthLabel = `${r.nendoLabel.replace('年度','')}${r.month}月分`;
+  let h = `<div class="kanri-wrap">`;
+  h += `<div class="kanri-doc-title">管理費等清算書</div>`;
+
+  if(r.propertyName) h += `<div class="seisan-property">${r.propertyName}</div>`;
+
+  h += `<div class="seisan-info">`;
+  if(r.address)    h += `<strong>物件所在地：</strong>${r.address}　`;
+  if(r.sellerName) h += `<strong>売主：</strong>${r.sellerName}　`;
+  if(r.buyerName)  h += `<strong>買主：</strong>${r.buyerName}　`;
+  h += `<strong>引渡日：</strong>${fmtDate(r.year,r.month,r.day)}`;
+  h += `</div>`;
+
+  // 月額内訳テーブル
+  h += `<div class="section-header">
+    <span class="section-num">1.</span>
+    <span class="section-title">${monthLabel}　管理費等内訳</span>
+    <span class="section-eq">＝</span>
+    <span class="section-total">月額合計 金 ${fmtN(r.kanriTotal.monthly)}円</span>
+  </div>`;
+
+  h += `<div class="tax4-wrap">
+    <table class="kanri-table">
+      <thead>
+        <tr>
+          <th style="width:30%;text-align:left;padding-left:10px;">項　目</th>
+          <th style="width:23%;">月　額</th>
+          <th style="width:23%;">売主様 負担額</th>
+          <th style="width:24%;">買主様 負担額</th>
+        </tr>
+      </thead>
+      <tbody>`;
+  r.kanriItems.forEach(item => {
+    h += `<tr>
+      <td class="kt-lbl" style="padding-left:10px;">${item.name}</td>
+      <td>¥${fmtN(item.monthly)}</td>
+      <td>¥${fmtN(item.seller)}</td>
+      <td>¥${fmtN(item.buyer)}</td>
+    </tr>`;
+  });
+  h += `<tr class="kt-total">
+    <td class="kt-lbl" style="padding-left:10px;">合　計</td>
+    <td>¥${fmtN(r.kanriTotal.monthly)}</td>
+    <td>¥${fmtN(r.kanriTotal.seller)}</td>
+    <td>¥${fmtN(r.kanriTotal.buyer)}</td>
+  </tr>
+      </tbody>
+    </table>
+  </div>`;
+
+  // 負担日数区分（月）
+  h += `<div class="subsec-wrap">
+    <div class="subsec-title">①負担日数区分（引渡月：${r.daysInMonth}日間）</div>
+    <div class="days-table">
+      <div class="days-row" style="margin-bottom:4px;">
+        <span class="dl">引　渡　日：</span>
+        <span class="dd"><strong style="font-size:14px;">${fmtDate(r.year,r.month,r.day)}</strong></span>
+      </div>
+      <div class="days-row" style="margin-bottom:4px;">
+        <span class="dl">売主様負担分：</span>
+        <span class="dd"><strong>${r.sDaysMonth}</strong> 日分</span>
+        <span class="dp">${r.kanriSellerFrom} ～ ${r.kanriSellerTo}</span>
+      </div>
+      <div class="days-row">
+        <span class="dl">買主様負担分：</span>
+        <span class="dd"><strong>${r.bDaysMonth}</strong> 日分</span>
+        <span class="dp">${r.kanriBuyerFrom} ～ ${r.kanriBuyerTo}</span>
+      </div>
+    </div>
+  </div>`;
+
+  // 日割り清算式
+  h += `<div class="subsec-wrap">
+    <div class="subsec-title">②日割り清算式</div>
+    <table class="formula-table">`;
+  r.kanriItems.forEach((item, i) => {
+    h += `<tr>
+      <td class="fm-item" style="color:#9a3412;">${item.name}</td>
+      <td class="fm-label">月　額</td>
+      <td class="fm-amt">金${fmtN(item.monthly)}円</td>
+      <td class="fm-op">×</td>
+      <td class="fm-days">${r.bDaysMonth}</td>
+      <td class="fm-op">÷</td>
+      <td class="fm-yr">${r.daysInMonth}</td>
+      <td class="fm-eq">=</td>
+      <td class="fm-result" style="color:#9a3412;">金${fmtN(item.buyer)}円</td>
+      <td class="fm-idx" style="color:#c2410c;">…${'①②③④⑤'[i]}</td>
+    </tr>`;
+  });
+  h += `</table>
+    <div class="formula-note">※小数点以下四捨五入　※引渡日は買主様負担</div>
+  </div>`;
+
+  // 精算金バー
+  h += `<div class="kanri-settle-bar">
+    <span class="kanri-settle-label">買主様より売主様への清算金（管理費等）</span>
+    <span class="kanri-settle-amount">金 ${fmtN(r.kanriTotal.buyer)}円</span>
+  </div>`;
+
+  h += `</div>`;
+  return h;
+}
+
 /* ===== リセット ===== */
 function resetForm(){
   ['propertyName','address','sellerName','buyerName','settlementDate','nendoLabel',
-   'land_fixed','land_city','land_fn','land_fd','bldg_fixed','bldg_city'].forEach(id=>{
+   'land_fixed','land_city','land_fn','land_fd','bldg_fixed','bldg_city',
+   'kanri_fee','shuzen_fee','other1_name','other1_fee','other2_name','other2_fee'].forEach(id=>{
     document.getElementById(id).value='';
   });
   document.getElementById('sellerTypePersonal').checked=true;
@@ -598,7 +798,8 @@ function downloadExcel(){
   try{
     const wb = XLSX.utils.book_new();
     buildSeisanSheet(wb, calcResult);
-    const fname = `固都税精算書_${calcResult.nendoLabel}_${calcResult.propertyName||calcResult.address||'物件'}.xlsx`;
+    if(calcResult.kanriItems.length > 0) buildKanriSheet(wb, calcResult);
+    const fname = `精算書_${calcResult.nendoLabel}_${calcResult.propertyName||calcResult.address||'物件'}.xlsx`;
     XLSX.writeFile(wb, fname);
   }catch(e){alert('Excel出力エラー: '+e.message);console.error(e);}
 }
@@ -860,6 +1061,138 @@ function buildSeisanSheet(wb, r){
   ws['!rows']=rowH;
   ws['!pageSetup']={paperSize:9,orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:1};
   XLSX.utils.book_append_sheet(wb, ws, '固都税精算書');
+}
+function buildKanriSheet(wb, r){
+  const ws={};const merges=[];const rowH=[];let rn=-1;
+  function nr(vals,h){rn++;rowH.push({hpt:h||15});vals.forEach((cell,ci)=>{if(cell!=null)ws[XLSX.utils.encode_cell({r:rn,c:ci})]=cell;});return rn;}
+  const M=(r1,c1,r2,c2)=>merges.push({s:{r:r1,c:c1},e:{r:r2,c:c2}});
+  const BD={top:{style:'thin',color:{rgb:'FED7AA'}},bottom:{style:'thin',color:{rgb:'FED7AA'}},left:{style:'thin',color:{rgb:'FED7AA'}},right:{style:'thin',color:{rgb:'FED7AA'}}};
+  const BDm=c=>({top:{style:'medium',color:{rgb:c}},bottom:{style:'medium',color:{rgb:c}},left:{style:'medium',color:{rgb:c}},right:{style:'medium',color:{rgb:c}}});
+  function cs(v,s){return{v,t:'s',s:s||{}};}
+  function cn(v,s){return{v,t:'n',s:s||{}};}
+  function cf(f,v,s){return{f,v,t:'n',s:s||{}};}
+  function R(row){return row+1;}
+  function fnt(bold,sz,clr){return{name:'メイリオ',bold:!!bold,sz:sz||10,color:{rgb:clr||'333333'}};}
+  function fill(c){return{patternType:'solid',fgColor:{rgb:c}};}
+  function aln(h,v2){return{horizontal:h||'left',vertical:v2||'center'};}
+
+  const monthLabel = `${r.nendoLabel.replace('年度','')}${r.month}月分`;
+
+  // タイトル
+  let rr=nr([cs('管理費等清算書',{font:fnt(true,16,'FFFFFF'),fill:fill('C2410C'),alignment:aln('center')})],34);
+  M(rr,0,rr,4);
+
+  if(r.propertyName){
+    rr=nr([cs(r.propertyName,{font:fnt(true,14,'1E3A6E'),fill:fill('DBEAFE'),alignment:aln('center')})],30);
+    M(rr,0,rr,4);
+  }
+  nr([],6);
+
+  // 基本情報
+  const sLbl={font:fnt(true,9,'7C2D12'),fill:fill('FFF7ED'),alignment:aln('center'),border:BD};
+  const sVal={font:fnt(false,10),fill:fill('FFFFFF'),alignment:aln('left'),border:BD};
+  if(r.address){rr=nr([cs('物件所在地',sLbl),cs(r.address,sVal),null,null,null],18);M(rr,1,rr,4);}
+  if(r.sellerName||r.buyerName){
+    rr=nr([cs('売主 / 買主',sLbl),cs(`${r.sellerName||'（未入力）'}　／　${r.buyerName||'（未入力）'}`,sVal),null,null,null],18);
+    M(rr,1,rr,4);
+  }
+  rr=nr([cs('引渡日',sLbl),cs(fmtDate(r.year,r.month,r.day),sVal),null,null,null],18);M(rr,1,rr,4);
+  nr([],8);
+
+  // セクションヘッダ
+  const sHdr={font:fnt(true,11,'FFFFFF'),fill:fill('7C2D12'),alignment:aln('left')};
+  rr=nr([cs(`1.　${monthLabel}　管理費等内訳`,sHdr),null,null,null,null],26);M(rr,0,rr,4);
+
+  // テーブルヘッダ
+  const sHT={font:fnt(true,9,'FFFFFF'),fill:fill('7C2D12'),alignment:aln('center'),border:BD};
+  rr=nr([cs('項　目',sHT),cs('月　額',sHT),cs('売主様 負担額',sHT),cs('買主様 負担額',sHT),null],26);
+
+  // データ行
+  const sItemL={font:fnt(true,10,'7C2D12'),fill:fill('FFF7ED'),alignment:aln('left'),border:BD};
+  const sAmt  ={font:fnt(false,11),fill:fill('FFFFFF'),alignment:aln('right'),border:BD,numFmt:'"¥"#,##0'};
+  const sAmtS ={font:fnt(false,11,'7F1D1D'),fill:fill('FFF1F2'),alignment:aln('right'),border:BD,numFmt:'"¥"#,##0'};
+  const sAmtB ={font:fnt(false,11,'1E3A6E'),fill:fill('EFF6FF'),alignment:aln('right'),border:BD,numFmt:'"¥"#,##0'};
+
+  const dataRowStart = rn + 1; // 次の行から
+  r.kanriItems.forEach(item=>{
+    nr([cs(item.name,sItemL), cn(item.monthly,sAmt), cn(item.seller,sAmtS), cn(item.buyer,sAmtB), null],22);
+  });
+
+  // 合計行（数式）
+  const dataRowEnd = rn;
+  const sTL={font:fnt(true,10,'7C2D12'),fill:fill('FFF7ED'),alignment:aln('left'),border:BDm('C2410C')};
+  const sTM={font:fnt(true,11,'333333'),fill:fill('FFF7ED'),alignment:aln('right'),border:BDm('C2410C'),numFmt:'"¥"#,##0'};
+  const sTS={font:fnt(true,11,'7F1D1D'),fill:fill('FEE2E2'),alignment:aln('right'),border:BDm('C2410C'),numFmt:'"¥"#,##0'};
+  const sTB={font:fnt(true,11,'1E3A6E'),fill:fill('DBEAFE'),alignment:aln('right'),border:BDm('C2410C'),numFmt:'"¥"#,##0'};
+  rr=nr([cs('合　計',sTL),
+    cf(`SUM(B${R(dataRowStart)}:B${R(dataRowEnd)})`,r.kanriTotal.monthly,sTM),
+    cf(`SUM(C${R(dataRowStart)}:C${R(dataRowEnd)})`,r.kanriTotal.seller, sTS),
+    cf(`SUM(D${R(dataRowStart)}:D${R(dataRowEnd)})`,r.kanriTotal.buyer,  sTB),
+    null],26);
+  const rowKanriTotal = rr;
+  nr([],8);
+
+  // ①負担日数区分
+  const sSub={font:fnt(true,11,'FFFFFF'),fill:fill('7C2D12'),alignment:aln('left')};
+  rr=nr([cs(`　①負担日数区分（引渡月：${r.daysInMonth}日間）`,sSub),null,null,null,null],22);M(rr,0,rr,4);
+
+  const sDL={font:fnt(true,9,'7C2D12'),fill:fill('FFF7ED'),alignment:aln('right'),border:BD};
+  const sDD={font:fnt(false,10),fill:fill('FFFFFF'),alignment:aln('left'),border:BD};
+  const sDB={font:fnt(true,12,'C2410C'),fill:fill('FFF7ED'),alignment:aln('center'),border:BD};
+  rr=nr([cs('引　渡　日：',sDL),cs(fmtDate(r.year,r.month,r.day),{...sDD,font:fnt(true,11,'7C2D12')}),null,null,null],22);M(rr,1,rr,4);
+  rr=nr([cs('売主様負担分：',sDL),cn(r.sDaysMonth,sDB),cs('日分',sDD),cs(r.kanriSellerFrom,sDD),cs(`～ ${r.kanriSellerTo}`,sDD)],20);
+  rr=nr([cs('買主様負担分：',sDL),cn(r.bDaysMonth,sDB),cs('日分',sDD),cs(r.kanriBuyerFrom,sDD),cs(`～ ${r.kanriBuyerTo}`,sDD)],20);
+  nr([],8);
+
+  // ②日割り清算式
+  rr=nr([cs('　②日割り清算式',sSub),null,null,null,null],22);M(rr,0,rr,4);
+
+  const sFL={font:fnt(true,10,'7C2D12'),fill:fill('FFF7ED'),alignment:aln('center'),border:BD};
+  const sFV={font:fnt(false,10),fill:fill('FFF7ED'),alignment:aln('center'),border:BD};
+  const sFR={font:fnt(true,12,'C2410C'),fill:fill('FFF7ED'),alignment:aln('right'),border:BD,numFmt:'"金"#,##0"円"'};
+  const idxList='①②③④⑤';
+  const itemDataRow = dataRowStart; // 各行のExcel行番号は dataRowStart + i
+  r.kanriItems.forEach((item,i)=>{
+    const itemRow = dataRowStart + i;
+    rr=nr([
+      cs(item.name,sFL),
+      cs('月　額',{...sFV,font:fnt(false,9,'666666')}),
+      cn(item.monthly,{...sFV,numFmt:'"金"#,##0"円"'}),
+      cs(`× ${r.bDaysMonth} ÷ ${r.daysInMonth}`,{...sFV,font:fnt(false,9,'666666')}),
+      cf(`ROUND(C${itemRow}*${r.bDaysMonth}/${r.daysInMonth},0)`,item.buyer,sFR)
+    ],22);
+    // 数式セルを上書き（正しい行参照）
+    ws[XLSX.utils.encode_cell({r:rr,c:4})] = cf(
+      `ROUND(C${itemRow}*${r.bDaysMonth}/${r.daysInMonth},0)`,
+      item.buyer, sFR
+    );
+    nr([cs('',{fill:fill('FFF7ED'),border:BD}),null,null,cs(idxList[i],{font:fnt(true,10,'C2410C'),fill:fill('FFF7ED'),alignment:aln('center'),border:BD}),null],10);
+  });
+
+  const sNote={font:fnt(false,8,'9A3412'),fill:fill('FFF7ED'),alignment:aln('left')};
+  rr=nr([cs('※小数点以下四捨五入　引渡日は買主様負担',sNote),null,null,null,null],12);M(rr,0,rr,4);
+  nr([],10);
+
+  // 精算金ボックス
+  const boxBg='FFF7ED';
+  rr=nr([
+    cs('買主様より売主様への清算金（管理費等）',{font:fnt(true,12,'7C2D12'),fill:fill(boxBg),alignment:aln('center'),border:BDm('C2410C')}),
+    null,null,
+    cf(`D${R(rowKanriTotal)}`,r.kanriTotal.buyer,{font:fnt(true,18,'C2410C'),fill:fill(boxBg),alignment:aln('right'),border:BDm('C2410C'),numFmt:'"金 "#,##0"円"'})
+    ,null
+  ],40);
+  M(rr,0,rr,2);M(rr,3,rr,4);
+
+  nr([],10);
+  const sCond={font:fnt(false,8,'AAAAAA'),fill:fill('F8FAFC'),alignment:aln('left')};
+  rr=nr([cs('計算条件：引渡日は買主負担　日割 四捨五入（月単位）',sCond),null,null,null,null],14);M(rr,0,rr,4);
+
+  ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rn,c:4}});
+  ws['!merges']=merges;
+  ws['!cols']=[{wch:20},{wch:14},{wch:14},{wch:14},{wch:14}];
+  ws['!rows']=rowH;
+  ws['!pageSetup']={paperSize:9,orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:1};
+  XLSX.utils.book_append_sheet(wb, ws, '管理費等精算書');
 }
 </script>
 </body>
