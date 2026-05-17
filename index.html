@@ -389,9 +389,9 @@ function calculate(){
   const landFixed = hasFrac ? Math.round(landFixed0 * fn/fd) : landFixed0;
   const landCity  = hasFrac ? Math.round(landCity0  * fn/fd) : landCity0;
 
-  // 年税額
-  const landAnnualTax = landFixed + landCity;
-  const bldgAnnualTax = bldgFixed + bldgCity;
+  // 年税額（100円未満切り捨て）
+  const landAnnualTax = Math.floor((landFixed + landCity) / 100) * 100;
+  const bldgAnnualTax = Math.floor((bldgFixed + bldgCity) / 100) * 100;
   const totalAnnualTax = landAnnualTax + bldgAnnualTax;
 
   // 日割り（買主負担を四捨五入、売主は残り）
